@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.6
+// @version      3.7
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -76,7 +76,18 @@
         label: "OTX",
         class: "mx-otx",
         priority: 90,
-        url: (q) => `https://otx.alienvault.com/indicator/${q}`,
+        url: (q, { isIP: isIP2, isDomain: isDomain2, isHash: isHash2 }) => {
+          if (isIP2(q)) {
+            return `https://otx.alienvault.com/indicator/ip/${q}`;
+          }
+          if (isDomain2(q)) {
+            return `https://otx.alienvault.com/indicator/domain/${q}`;
+          }
+          if (isHash2(q)) {
+            return `https://otx.alienvault.com/indicator/file/${q}`;
+          }
+          return `https://otx.alienvault.com/browse/global/indicators`;
+        },
         match: ["*://*/*"],
         condition: (t, { isIP: isIP2, isDomain: isDomain2, isHash: isHash2 }) => isIP2(t) || isDomain2(t) || isHash2(t)
       },

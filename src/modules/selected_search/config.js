@@ -45,8 +45,22 @@ export default {
 			label: "OTX",
 			class: "mx-otx",
 			priority: 90,
-			url: (q) => `https://otx.alienvault.com/indicator/${q}`,
+
+			url: (q, { isIP, isDomain, isHash }) => {
+				if (isIP(q)) {
+					return `https://otx.alienvault.com/indicator/ip/${q}`;
+				}
+				if (isDomain(q)) {
+					return `https://otx.alienvault.com/indicator/domain/${q}`;
+				}
+				if (isHash(q)) {
+					return `https://otx.alienvault.com/indicator/file/${q}`;
+				}
+				return `https://otx.alienvault.com/browse/global/indicators`;
+			},
+
 			match: ["*://*/*"],
+
 			condition: (t, { isIP, isDomain, isHash }) => isIP(t) || isDomain(t) || isHash(t),
 		},
 
