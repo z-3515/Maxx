@@ -37,7 +37,9 @@ meta = meta.replace(versionRegex, `@version      ${newVersion}`);
 // ===============================
 // 4) GHI LẠI METADATA
 // ===============================
-fs.writeFileSync(META_FILE, meta);
+fs.writeFileSync(META_FILE, meta, {
+	encoding: "utf8",
+});
 
 // ===============================
 // 5) Bundle code bằng esbuild
@@ -47,11 +49,12 @@ esbuild
 		entryPoints: [ENTRY_FILE],
 		bundle: true,
 		minify: false,
-		write: false, // vẫn giữ như bạn đang làm
+		write: false,
 		format: "iife",
-		platform: "browser", // ⭐ rất nên có
+		platform: "browser",
+		charset: "utf8",
 		loader: {
-			".css": "text", // ⭐ FIX CHÍNH Ở ĐÂY
+			".css": "text",
 		},
 	})
 	.then((result) => {
@@ -60,7 +63,9 @@ esbuild
 ${result.outputFiles[0].text}
 `;
 
-		fs.writeFileSync(OUTPUT_FILE, finalOutput);
+		fs.writeFileSync(OUTPUT_FILE, finalOutput, {
+			encoding: "utf8",
+		});
 		console.log("🎉 Build thành công → dist/maxx.user.js");
 	})
 	.catch((err) => {

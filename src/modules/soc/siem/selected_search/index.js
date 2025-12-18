@@ -1,194 +1,130 @@
-let selectedText = "";
-let mounted = false;
-let uiRef = null;
+import config from "./config.js";
 
-/* =========================
-   UI CREATION
-========================= */
-function createUI() {
-	injectStyle();
+export default function selectedSearch(ctx) {
+	if (!config.enabled) return;
 
-	const container = document.createElement("div");
-	container.id = "maxx-selection-search";
+	const { engines, ui } = config;
 
-	const main = document.createElement("div");
-	main.className = "main-icon";
-	main.textContent = "🔍";
+	/* ==========================
+	   STYLE
+	========================== */
+	const style = document.createElement("style");
+	style.textContent = `
+		.mx-search-box {
+			position: fixed;
+			display: flex;
+			gap: 6px;
+			padding: 6px;
+			background: rgba(15,23,42,.85);
+			backdrop-filter: blur(6px);
+			border-radius: 999px;
+			box-shadow: 0 10px 30px rgba(0,0,0,.4);
+			transform: scale(.6);
+			opacity: 0;
+			pointer-events: none;
+			transition: all .2s cubic-bezier(.25,.8,.25,1);
+			z-index: ${ui?.zIndex ?? 999999};
+		}
 
-	const actions = document.createElement("div");
-	actions.className = "actions";
+		.mx-search-box.show {
+			transform: scale(1);
+			opacity: 1;
+			pointer-events: auto;
+		}
 
-	const google = createAction("G", () => openSearch("https://www.google.com/search?q="));
+		.mx-btn {
+			width: 34px;
+			height: 34px;
+			border-radius: 50%;
+			display: grid;
+			place-items: center;
+			cursor: pointer;
+			font-weight: 700;
+			font-size: 13px;
+			color: #fff;
+			user-select: none;
+			transition: all .2s ease;
+		}
 
-	const vt = createAction("VT", () => openSearch("https://www.virustotal.com/gui/search/"));
+		.mx-btn:hover {
+			transform: scale(1.15) rotate(6deg);
+			box-shadow: 0 0 12px currentColor;
+		}
 
-	actions.append(google, vt);
-	container.append(main, actions);
+		.mx-google {
+			background: radial-gradient(circle,#60a5fa,#2563eb);
+		}
 
-	return { container };
-}
+		.mx-vt {
+			background: radial-gradient(circle,#34d399,#059669);
+		}
+	`;
+	document.head.appendChild(style);
 
-function createAction(label, onClick) {
-	const el = document.createElement("div");
-	el.className = "action";
-	el.textContent = label;
+	/* ==========================
+	   UI
+	========================== */
+	const box = document.createElement("div");
+	box.className = "mx-search-box";
 
-	el.addEventListener("click", (e) => {
-		e.stopPropagation();
-		if (!selectedText) return;
-		onClick();
-		cleanupSelection();
+	let selectedText = "";
+
+	Object.values(engines).forEach((engine) => {
+		const btn = document.createElement("div");
+		btn.className = `mx-btn ${engine.class}`;
+		btn.textContent = engine.label;
+
+		btn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			if (!selectedText) return;
+
+			window.open(engine.url(encodeURIComponent(selectedText)), "_blank");
+			hide();
+		});
+
+		box.appendChild(btn);
 	});
 
-	return el;
-}
+	document.body.appendChild(box);
 
-/* =========================
-   STYLE
-========================= */
-function injectStyle() {
-	if (document.getElementById("maxx-selection-style")) return;
+	/* ==========================
+	   POSITION & STATE
+	========================== */
+	function show(rect) {
+		box.style.left = rect.right + (ui?.offsetX ?? 8) + "px";
+		box.style.top = rect.top + (ui?.offsetY ?? -10) + "px";
 
-	const style = document.createElement("style");
-	style.id = "maxx-selection-style";
-	style.textContent = `
-#maxx-selection-search {
-	position: fixed;
-	z-index: 999999;
-	display: none;
-	user-select: none;
-	font-family: system-ui;
-}
-
-#maxx-selection-search .main-icon {
-	background: #0ea5e9;
-	color: #fff;
-	padding: 6px;
-	border-radius: 50%;
-	cursor: pointer;
-	box-shadow: 0 4px 12px rgba(0,0,0,.3);
-}
-
-#maxx-selection-search .actions {
-	position: absolute;
-	top: 0;
-	left: 110%;
-	display: flex;
-	gap: 6px;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity .15s ease;
-}
-
-#maxx-selection-search:hover .actions {
-	opacity: 1;
-	pointer-events: auto;
-}
-
-#maxx-selection-search .action {
-	background: #111;
-	color: #fff;
-	font-size: 12px;
-	padding: 6px;
-	border-radius: 50%;
-	cursor: pointer;
-}
-
-#maxx-selection-search .action:hover {
-	background: #f97316;
-}
-`;
-	document.head.appendChild(style);
-}
-
-/* =========================
-   SELECTION LOGIC
-========================= */
-function isTextInput(el) {
-	if (!el) return false;
-	return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable === true;
-}
-
-function handleSelection(ui) {
-	const selection = window.getSelection();
-	if (!selection || selection.isCollapsed) {
-		hide(ui);
-		return;
+		box.classList.add("show");
 	}
 
-	const anchorNode = selection.anchorNode;
-	const anchorEl = anchorNode?.nodeType === 1 ? anchorNode : anchorNode?.parentElement;
-
-	if (isTextInput(anchorEl)) {
-		hide(ui);
-		return;
+	function hide() {
+		box.classList.remove("show");
+		selectedText = "";
 	}
 
-	const text = selection.toString().trim();
-	if (!text) {
-		hide(ui);
-		return;
-	}
+	/* ==========================
+	   SELECTION HANDLER
+	========================== */
+	document.addEventListener("mouseup", () => {
+		const sel = window.getSelection();
+		if (!sel || sel.isCollapsed) return hide();
 
-	selectedText = text;
+		const text = sel.toString().trim();
+		if (!text) return hide();
 
-	try {
-		const rect = selection.getRangeAt(0).getBoundingClientRect();
-		if (rect.width || rect.height) {
-			show(ui, rect);
+		selectedText = text;
+
+		try {
+			const rect = sel.getRangeAt(0).getBoundingClientRect();
+			if (rect.width || rect.height) show(rect);
+		} catch {
+			hide();
 		}
-	} catch {
-		hide(ui);
-	}
-}
-
-function show(ui, rect) {
-	ui.container.style.left = rect.right + 6 + "px";
-	ui.container.style.top = rect.top - 6 + "px";
-	ui.container.style.display = "block";
-}
-
-function hide(ui) {
-	ui.container.style.display = "none";
-	selectedText = "";
-}
-
-/* =========================
-   ACTIONS
-========================= */
-function openSearch(baseUrl) {
-	if (!selectedText) return;
-	window.open(baseUrl + encodeURIComponent(selectedText), "_blank");
-}
-
-function cleanupSelection() {
-	if (!uiRef) return;
-	hide(uiRef);
-	window.getSelection().removeAllRanges();
-}
-
-/* =========================
-   MODULE ENTRY
-========================= */
-export default function run(ctx) {
-	// Chỉ chạy top window
-	if (ctx.isIframe) return;
-
-	// Chỉ mount 1 lần
-	if (mounted) return;
-	mounted = true;
-
-	uiRef = createUI();
-	document.body.appendChild(uiRef.container);
-
-	document.addEventListener("mouseup", (e) => {
-		if (uiRef.container.contains(e.target)) return;
-		handleSelection(uiRef);
 	});
 
 	document.addEventListener("mousedown", (e) => {
-		if (!uiRef.container.contains(e.target)) {
-			hide(uiRef);
-		}
+		if (!box.contains(e.target)) hide();
 	});
+
+	console.log("✅ selected_search loaded", ctx);
 }
