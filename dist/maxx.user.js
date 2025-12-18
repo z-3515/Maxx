@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      2.14
+// @version      2.15
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -16,7 +16,6 @@
 (() => {
   // src/modules/test/index.js
   function runTestModule(ctx) {
-    console.log("✅ test module running", ctx);
   }
 
   // src/modules/test/config.js
@@ -169,7 +168,6 @@
     document.addEventListener("mousedown", (e) => {
       if (!box.contains(e.target)) hide();
     });
-    console.log("✅ selected_search loaded", ctx);
   }
 
   // src/modules/soc/siem/offense_whitelist_highlighter/config.js
@@ -199,7 +197,7 @@
       whitelist: ["REC: Alert from IDPS of BO_KHCN containing", "Cang_HPG"]
     },
     siem: {
-      whitelist: ["VNPT Media	EXE: Detect wscript or cscript execute vbs file"]
+      whitelist: ["VNPT Media EXE: Detect wscript or cscript execute vbs file"]
     }
   };
 
@@ -329,7 +327,6 @@
         clearInterval(timer);
         document.querySelectorAll(config_default3.selector.rows).forEach(processRow);
         initObserver();
-        console.log("✅ offense whitelist highlighter loaded (final optimized)", ctx);
       }
       if (++retry > 20) clearInterval(timer);
     }, 500);

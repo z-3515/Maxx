@@ -172,7 +172,6 @@ export default function offenseWhitelistHighlighter(ctx) {
 			document.querySelectorAll(config.selector.rows).forEach(processRow);
 
 			initObserver();
-			console.log("✅ offense whitelist highlighter loaded (final optimized)", ctx);
 		}
 
 		if (++retry > 20) clearInterval(timer);

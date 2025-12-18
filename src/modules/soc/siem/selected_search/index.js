@@ -125,6 +125,4 @@ export default function selectedSearch(ctx) {
 	document.addEventListener("mousedown", (e) => {
 		if (!box.contains(e.target)) hide();
 	});
-
-	console.log("✅ selected_search loaded", ctx);
 }
