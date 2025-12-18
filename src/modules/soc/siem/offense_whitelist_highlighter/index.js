@@ -2,6 +2,28 @@ import config from "./config.js";
 import { isActiveIframe } from "../helper/iframe.js";
 import { observeElement } from "../helper/observe.js";
 
+function getRowSearchText(tr) {
+	const tds = tr.querySelectorAll("td");
+	if (!tds || tds.length === 0) return "";
+
+	// Lấy text từng cột → join có dấu cách để tránh dính chữ
+	const parts = Array.from(tds).map((td) => (td.textContent || "").trim());
+
+	let s = parts.join(" ");
+
+	// normalize whitespace
+	s = s.replace(/\s+/g, " ").trim();
+
+	// strip noise thường gặp trong SIEM grid (nếu DOM có text kiểu function call)
+	s = s
+		.replace(/dynamicpopupmenu\s*\([^)]*\)\s*;?/gi, " ")
+		.replace(/domapi\.getelm\s*\([^)]*\)/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+
+	return s.toLowerCase();
+}
+
 export default function offenseWhitelistHighlighter(ctx) {
 	if (!config.enabled) return;
 	if (config.iframe && !isActiveIframe()) return;
@@ -10,166 +32,125 @@ export default function offenseWhitelistHighlighter(ctx) {
 	const isMSS = url.includes("mss.");
 	const whitelist = (isMSS ? config.mss.whitelist : config.siem.whitelist) || [];
 
-	if (!Array.isArray(whitelist) || whitelist.length === 0) {
-		console.warn("⚠️ Whitelist rỗng, bỏ qua highlight");
-		return;
-	}
+	if (!Array.isArray(whitelist) || whitelist.length === 0) return;
 
 	/* ==========================
-	   STYLE (KHÔNG ĐÈ SELECT STATE)
+	   STYLE (NHẸ – KHÔNG ĐÈ SELECT)
 	========================== */
 	const style = document.createElement("style");
 	style.textContent = `
-		/* chỉ dùng viền/outline, hạn chế đụng background để tránh xung đột row selected */
 		tr.mx-offense-whitelist-row {
-			outline: 1px solid rgba(148, 163, 184, .55);
+			outline: 1px solid rgba(148,163,184,.45);
 			outline-offset: -1px;
-			box-shadow: inset 3px 0 0 rgba(148, 163, 184, .9);
+			box-shadow: inset 3px 0 0 rgba(148,163,184,.7);
 		}
 
-		/* Nếu grid có class selected kiểu datarowselected (hoặc tương tự), giảm hiệu ứng xuống mức tối thiểu */
-		tr.mx-offense-whitelist-row.datarowselected,
-		tr.mx-offense-whitelist-row.selected,
-		tr.mx-offense-whitelist-row.is-selected,
-		tr.mx-offense-whitelist-row[aria-selected="true"] {
-			outline-color: rgba(148, 163, 184, .35);
-			box-shadow: inset 3px 0 0 rgba(148, 163, 184, .45);
-		}
-
-        /* offenseId đỏ khi row whitelist */
 		tr.mx-offense-whitelist-row td[propertyname="offenseId"] {
-			color: #dc2626 !important; /* red-600 */
+			color: #dc2626 !important;
 			font-weight: 600;
 		}
 
-		/* khi row selected (đảo màu), giảm đỏ xuống để không chói */
 		tr.mx-offense-whitelist-row.datarowselected td[propertyname="offenseId"],
 		tr.mx-offense-whitelist-row.selected td[propertyname="offenseId"],
 		tr.mx-offense-whitelist-row.is-selected td[propertyname="offenseId"],
 		tr.mx-offense-whitelist-row[aria-selected="true"] td[propertyname="offenseId"] {
-			color: #fecaca !important; /* red-200 */
+			color: #fecaca !important;
 		}
 
 		.mx-whitelist-badge {
-			display: inline-flex;
-			align-items: center;
-			gap: 6px;
-			margin-left: 8px;
-			padding: 2px 8px;
+			margin-left: 6px;
+			padding: 1px 6px;
 			border-radius: 999px;
 			font-size: 11px;
-			line-height: 1.6;
-			white-space: nowrap;
-			border: 1px solid rgba(148, 163, 184, .55);
-			background: rgba(148, 163, 184, .12);
+			border: 1px solid rgba(148,163,184,.5);
+			background: rgba(148,163,184,.12);
 			color: #334155;
 			user-select: none;
-		}
-
-		.mx-whitelist-badge b {
-			font-weight: 700;
-			color: #0f172a;
-		}
-
-		/* Khi row selected (đảo màu), badge tự “nhạt” để không rối */
-		tr.datarowselected .mx-whitelist-badge,
-		tr.selected .mx-whitelist-badge,
-		tr.is-selected .mx-whitelist-badge,
-		tr[aria-selected="true"] .mx-whitelist-badge {
-			opacity: .75;
+			white-space: nowrap;
 		}
 	`;
 	document.head.appendChild(style);
 
 	/* ==========================
+	   CACHE (RẤT QUAN TRỌNG)
+	========================== */
+	const processedRows = new WeakMap();
+
+	/* ==========================
 	   CORE
 	========================== */
-	function getMatchedKeysFromRow(tr) {
-		// dùng innerText để match giống mẫu, không đụng DOM
-		const text = (tr.innerText || "").toLowerCase();
+	function processRow(tr) {
+		// Nếu row đã xử lý rồi → bỏ qua
+		if (processedRows.has(tr)) return;
+
+		const text = getRowSearchText(tr);
 		const matched = [];
 
 		for (const key of whitelist) {
-			const k = (key || "").trim();
-			if (!k) continue;
-			if (text.includes(k.toLowerCase())) matched.push(k);
+			const k = key?.toLowerCase();
+			if (k && text.includes(k)) matched.push(key);
 		}
-		return matched;
-	}
 
-	function setBadge(tr, matchedKeys) {
-		// gắn badge vào cell đầu tiên (ổn định nhất)
+		processedRows.set(tr, matched);
+
+		if (matched.length === 0) return;
+
+		tr.classList.add("mx-offense-whitelist-row");
+
 		const firstTd = tr.querySelector("td");
 		if (!firstTd) return;
 
-		let badge = tr.querySelector(".mx-whitelist-badge");
-		if (!badge) {
-			badge = document.createElement("span");
-			badge.className = "mx-whitelist-badge";
-			firstTd.appendChild(badge);
-		}
+		const badge = document.createElement("span");
+		badge.className = "mx-whitelist-badge";
 
-		// tránh quá dài
-		const showKeys = matchedKeys.slice(0, 3);
-		const more = matchedKeys.length > 3 ? ` +${matchedKeys.length - 3}` : "";
+		const show = matched.slice(0, 2);
+		const more = matched.length > 2 ? ` +${matched.length - 2}` : "";
 
-		badge.innerHTML = `<b>WL</b>: ${escapeHtml(showKeys.join(", "))}${more}`;
-		badge.title = `Whitelist match: ${matchedKeys.join(", ")}`;
+		badge.textContent = `WL: ${show.join(", ")}${more}`;
+		badge.title = `Whitelist: ${matched.join(", ")}`;
+
+		firstTd.appendChild(badge);
 	}
 
-	function removeBadge(tr) {
-		const badge = tr.querySelector(".mx-whitelist-badge");
-		if (badge) badge.remove();
-	}
-
-	function highlightRows() {
+	function scanRows() {
 		const rows = document.querySelectorAll(config.selector.rows);
 		if (!rows || rows.length === 0) return;
 
-		rows.forEach((tr) => {
-			const matchedKeys = getMatchedKeysFromRow(tr);
-
-			if (matchedKeys.length > 0) {
-				tr.classList.add("mx-offense-whitelist-row");
-				setBadge(tr, matchedKeys);
-			} else {
-				tr.classList.remove("mx-offense-whitelist-row");
-				removeBadge(tr);
-			}
-		});
+		rows.forEach(processRow);
 	}
 
 	/* ==========================
-	   OBSERVE
+	   OBSERVER (DEBOUNCE)
 	========================== */
 	function initObserver() {
 		const tbody = document.querySelector(config.selector.tbody);
 		if (!tbody) return;
 
+		let scheduled = false;
+
 		observeElement(tbody, () => {
-			highlightRows();
+			if (scheduled) return;
+
+			scheduled = true;
+			requestAnimationFrame(() => {
+				scheduled = false;
+				scanRows();
+			});
 		});
 	}
 
 	/* ==========================
-	   INIT (WAIT TABLE)
+	   INIT
 	========================== */
 	let retry = 0;
 	const timer = setInterval(() => {
 		const table = document.querySelector(config.selector.table);
 		if (table) {
 			clearInterval(timer);
-			highlightRows();
+			scanRows();
 			initObserver();
-			console.log("✅ offense whitelist highlighter loaded", ctx);
+			console.log("✅ offense whitelist highlighter loaded (optimized)", ctx);
 		}
 		if (++retry > 20) clearInterval(timer);
 	}, 500);
-}
-
-/* ==========================
-   UTILS
-========================== */
-function escapeHtml(str) {
-	return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
