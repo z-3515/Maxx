@@ -32,6 +32,6 @@ export default {
 		whitelist: ["REC: Alert from IDPS of BO_KHCN containing", "Cang_HPG"],
 	},
 	siem: {
-		whitelist: ["VNPT Media	EXE: Detect wscript or cscript execute vbs file"],
+		whitelist: ["VNPT Media EXE: Detect wscript or cscript execute vbs file"],
 	},
 };

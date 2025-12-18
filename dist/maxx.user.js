@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      2.13
+// @version      2.14
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -223,22 +223,15 @@
   }
 
   // src/modules/soc/siem/offense_whitelist_highlighter/index.js
-  function getRowSearchText(tr) {
-    const tds = tr.querySelectorAll("td");
-    if (!tds || tds.length === 0) return "";
-    const parts = Array.from(tds).map((td) => (td.textContent || "").trim());
-    let s = parts.join(" ");
-    s = s.replace(/\s+/g, " ").trim();
-    s = s.replace(/dynamicpopupmenu\s*\([^)]*\)\s*;?/gi, " ").replace(/domapi\.getelm\s*\([^)]*\)/gi, " ").replace(/\s+/g, " ").trim();
-    return s.toLowerCase();
-  }
   function offenseWhitelistHighlighter(ctx) {
     if (!config_default3.enabled) return;
     if (config_default3.iframe && !isActiveIframe()) return;
     const url = ctx.url || location.href;
     const isMSS = url.includes("mss.");
-    const whitelist = (isMSS ? config_default3.mss.whitelist : config_default3.siem.whitelist) || [];
-    if (!Array.isArray(whitelist) || whitelist.length === 0) return;
+    const rawWhitelist = isMSS ? config_default3.mss.whitelist : config_default3.siem.whitelist;
+    if (!Array.isArray(rawWhitelist) || rawWhitelist.length === 0) return;
+    const whitelist = rawWhitelist.map((k) => k?.toLowerCase().trim()).filter(Boolean);
+    if (whitelist.length === 0) return;
     const style = document.createElement("style");
     style.textContent = `
 		tr.mx-offense-whitelist-row {
@@ -272,14 +265,20 @@
 		}
 	`;
     document.head.appendChild(style);
-    const processedRows = /* @__PURE__ */ new WeakMap();
+    let processedRows = /* @__PURE__ */ new WeakMap();
+    function getRowSearchText(tr) {
+      const tds = tr.querySelectorAll("td");
+      if (!tds || tds.length === 0) return "";
+      let s = Array.from(tds).map((td) => (td.textContent || "").trim()).join(" ");
+      s = s.replace(/\s+/g, " ").replace(/dynamicpopupmenu\s*\([^)]*\)\s*;?/gi, " ").replace(/domapi\.getelm\s*\([^)]*\)/gi, " ").replace(/\s+/g, " ").trim();
+      return s.toLowerCase();
+    }
     function processRow(tr) {
       if (processedRows.has(tr)) return;
       const text = getRowSearchText(tr);
       const matched = [];
-      for (const key of whitelist) {
-        const k = key?.toLowerCase();
-        if (k && text.includes(k)) matched.push(key);
+      for (const k of whitelist) {
+        if (text.includes(k)) matched.push(k);
       }
       processedRows.set(tr, matched);
       if (matched.length === 0) return;
@@ -294,21 +293,32 @@
       badge.title = `Whitelist: ${matched.join(", ")}`;
       firstTd.appendChild(badge);
     }
-    function scanRows() {
-      const rows = document.querySelectorAll(config_default3.selector.rows);
-      if (!rows || rows.length === 0) return;
-      rows.forEach(processRow);
+    function processAddedRows(mutations) {
+      for (const m of mutations) {
+        m.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return;
+          if (node.matches?.("tr")) {
+            processRow(node);
+          } else {
+            node.querySelectorAll?.("tr").forEach(processRow);
+          }
+        });
+      }
     }
     function initObserver() {
       const tbody = document.querySelector(config_default3.selector.tbody);
       if (!tbody) return;
       let scheduled = false;
-      observeElement(tbody, () => {
+      observeElement(tbody, (mutations) => {
+        if (document.hidden) return;
+        if (mutations.some((m) => m.removedNodes.length)) {
+          processedRows = /* @__PURE__ */ new WeakMap();
+        }
         if (scheduled) return;
         scheduled = true;
         requestAnimationFrame(() => {
           scheduled = false;
-          scanRows();
+          processAddedRows(mutations);
         });
       });
     }
@@ -317,9 +327,9 @@
       const table = document.querySelector(config_default3.selector.table);
       if (table) {
         clearInterval(timer);
-        scanRows();
+        document.querySelectorAll(config_default3.selector.rows).forEach(processRow);
         initObserver();
-        console.log("✅ offense whitelist highlighter loaded (optimized)", ctx);
+        console.log("✅ offense whitelist highlighter loaded (final optimized)", ctx);
       }
       if (++retry > 20) clearInterval(timer);
     }, 500);

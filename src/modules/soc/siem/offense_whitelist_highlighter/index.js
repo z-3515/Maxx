@@ -2,40 +2,25 @@ import config from "./config.js";
 import { isActiveIframe } from "../helper/iframe.js";
 import { observeElement } from "../helper/observe.js";
 
-function getRowSearchText(tr) {
-	const tds = tr.querySelectorAll("td");
-	if (!tds || tds.length === 0) return "";
-
-	// Lấy text từng cột → join có dấu cách để tránh dính chữ
-	const parts = Array.from(tds).map((td) => (td.textContent || "").trim());
-
-	let s = parts.join(" ");
-
-	// normalize whitespace
-	s = s.replace(/\s+/g, " ").trim();
-
-	// strip noise thường gặp trong SIEM grid (nếu DOM có text kiểu function call)
-	s = s
-		.replace(/dynamicpopupmenu\s*\([^)]*\)\s*;?/gi, " ")
-		.replace(/domapi\.getelm\s*\([^)]*\)/gi, " ")
-		.replace(/\s+/g, " ")
-		.trim();
-
-	return s.toLowerCase();
-}
-
 export default function offenseWhitelistHighlighter(ctx) {
 	if (!config.enabled) return;
 	if (config.iframe && !isActiveIframe()) return;
 
 	const url = ctx.url || location.href;
 	const isMSS = url.includes("mss.");
-	const whitelist = (isMSS ? config.mss.whitelist : config.siem.whitelist) || [];
+	const rawWhitelist = isMSS ? config.mss.whitelist : config.siem.whitelist;
 
-	if (!Array.isArray(whitelist) || whitelist.length === 0) return;
+	if (!Array.isArray(rawWhitelist) || rawWhitelist.length === 0) return;
 
 	/* ==========================
-	   STYLE (NHẸ – KHÔNG ĐÈ SELECT)
+	   NORMALIZE WHITELIST (1 LẦN)
+	========================== */
+	const whitelist = rawWhitelist.map((k) => k?.toLowerCase().trim()).filter(Boolean);
+
+	if (whitelist.length === 0) return;
+
+	/* ==========================
+	   STYLE (NHẸ – SAFE SELECT)
 	========================== */
 	const style = document.createElement("style");
 	style.textContent = `
@@ -72,23 +57,42 @@ export default function offenseWhitelistHighlighter(ctx) {
 	document.head.appendChild(style);
 
 	/* ==========================
-	   CACHE (RẤT QUAN TRỌNG)
+	   CACHE
 	========================== */
-	const processedRows = new WeakMap();
+	let processedRows = new WeakMap();
 
 	/* ==========================
-	   CORE
+	   TEXT EXTRACT (FIX DÍNH CỘT)
+	========================== */
+	function getRowSearchText(tr) {
+		const tds = tr.querySelectorAll("td");
+		if (!tds || tds.length === 0) return "";
+
+		let s = Array.from(tds)
+			.map((td) => (td.textContent || "").trim())
+			.join(" ");
+
+		s = s
+			.replace(/\s+/g, " ")
+			.replace(/dynamicpopupmenu\s*\([^)]*\)\s*;?/gi, " ")
+			.replace(/domapi\.getelm\s*\([^)]*\)/gi, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+
+		return s.toLowerCase();
+	}
+
+	/* ==========================
+	   ROW PROCESS (NHẸ)
 	========================== */
 	function processRow(tr) {
-		// Nếu row đã xử lý rồi → bỏ qua
 		if (processedRows.has(tr)) return;
 
 		const text = getRowSearchText(tr);
 		const matched = [];
 
-		for (const key of whitelist) {
-			const k = key?.toLowerCase();
-			if (k && text.includes(k)) matched.push(key);
+		for (const k of whitelist) {
+			if (text.includes(k)) matched.push(k);
 		}
 
 		processedRows.set(tr, matched);
@@ -112,15 +116,25 @@ export default function offenseWhitelistHighlighter(ctx) {
 		firstTd.appendChild(badge);
 	}
 
-	function scanRows() {
-		const rows = document.querySelectorAll(config.selector.rows);
-		if (!rows || rows.length === 0) return;
+	/* ==========================
+	   PROCESS ONLY NEW ROWS
+	========================== */
+	function processAddedRows(mutations) {
+		for (const m of mutations) {
+			m.addedNodes.forEach((node) => {
+				if (node.nodeType !== 1) return;
 
-		rows.forEach(processRow);
+				if (node.matches?.("tr")) {
+					processRow(node);
+				} else {
+					node.querySelectorAll?.("tr").forEach(processRow);
+				}
+			});
+		}
 	}
 
 	/* ==========================
-	   OBSERVER (DEBOUNCE)
+	   OBSERVER (DEBOUNCE + SAFE)
 	========================== */
 	function initObserver() {
 		const tbody = document.querySelector(config.selector.tbody);
@@ -128,13 +142,20 @@ export default function offenseWhitelistHighlighter(ctx) {
 
 		let scheduled = false;
 
-		observeElement(tbody, () => {
-			if (scheduled) return;
+		observeElement(tbody, (mutations) => {
+			if (document.hidden) return;
 
+			// page switch → reset cache
+			if (mutations.some((m) => m.removedNodes.length)) {
+				processedRows = new WeakMap();
+			}
+
+			if (scheduled) return;
 			scheduled = true;
+
 			requestAnimationFrame(() => {
 				scheduled = false;
-				scanRows();
+				processAddedRows(mutations);
 			});
 		});
 	}
@@ -147,10 +168,13 @@ export default function offenseWhitelistHighlighter(ctx) {
 		const table = document.querySelector(config.selector.table);
 		if (table) {
 			clearInterval(timer);
-			scanRows();
+
+			document.querySelectorAll(config.selector.rows).forEach(processRow);
+
 			initObserver();
-			console.log("✅ offense whitelist highlighter loaded (optimized)", ctx);
+			console.log("✅ offense whitelist highlighter loaded (final optimized)", ctx);
 		}
+
 		if (++retry > 20) clearInterval(timer);
 	}, 500);
 }
