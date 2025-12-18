@@ -1,6 +1,6 @@
 export default {
 	/* ==========================
-	   MODULE META (GIỮ NGUYÊN)
+	        MODULE META
 	========================== */
 	name: "virustotal-search module",
 
@@ -19,7 +19,7 @@ export default {
 	priority: 10,
 
 	/* ==========================
-	   FEATURE CONFIG (MỚI)
+	        FEATURE CONFIG
 	========================== */
 	ui: {
 		offsetX: 8,
