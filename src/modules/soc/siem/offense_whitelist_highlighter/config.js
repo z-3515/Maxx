@@ -20,6 +20,7 @@ export default {
 
 	/* ==========================
 	        FEATURE CONFIG
+        b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 	========================== */
 	selector: {
 		frameName: "PAGE_SEM",

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      2.15
+// @version      2.20
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -11,6 +11,10 @@
 // @updateURL    https://raw.githubusercontent.com/z-3515/Maxx/main/dist/maxx.user.js
 // @downloadURL  https://raw.githubusercontent.com/z-3515/Maxx/main/dist/maxx.user.js
 // ==/UserScript==
+
+// module: offense-whitelist-highlighter module | b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
+// module: selected-search module | c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
+// module: test-module | dGVzdC1tb2R1bGU=
 
 
 (() => {
@@ -40,7 +44,7 @@
     /* ==========================
             MODULE META
     ========================== */
-    name: "virustotal-search module",
+    name: "selected-search module",
     enabled: true,
     match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
     exclude: [],
@@ -50,6 +54,7 @@
     priority: 10,
     /* ==========================
             FEATURE CONFIG
+       c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
     ========================== */
     ui: {
       offsetX: 8,
@@ -185,6 +190,7 @@
     priority: 10,
     /* ==========================
             FEATURE CONFIG
+           b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
     ========================== */
     selector: {
       frameName: "PAGE_SEM",

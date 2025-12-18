@@ -2,7 +2,7 @@ export default {
 	/* ==========================
 	        MODULE META
 	========================== */
-	name: "virustotal-search module",
+	name: "selected-search module",
 
 	enabled: true,
 
