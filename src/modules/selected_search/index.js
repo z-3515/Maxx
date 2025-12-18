@@ -171,7 +171,7 @@ export default function selectedSearch(ctx) {
 				e.stopPropagation();
 				if (!selectedText) return;
 
-				window.open(engine.url(encodeURIComponent(selectedText)), "_blank");
+				window.open(engine.url(encodeURIComponent(selectedText), { isIP, isDomain, isHash }), "_blank");
 				hide();
 			});
 
