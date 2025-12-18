@@ -117,7 +117,13 @@ export default function selectedSearch(ctx) {
 
 				// text condition
 				if (typeof engine.condition === "function") {
-					if (!engine.condition(text, { isIP, isDomain, isHash })) {
+					if (
+						!engine.condition(text, {
+							isIP,
+							isDomain,
+							isHash,
+						})
+					) {
 						return false;
 					}
 				}
@@ -195,5 +201,11 @@ export default function selectedSearch(ctx) {
 
 	document.addEventListener("mousedown", (e) => {
 		if (!box.contains(e.target)) hide();
+	});
+	document.addEventListener("selectionchange", () => {
+		const sel = window.getSelection();
+		if (!sel || sel.isCollapsed) {
+			hide();
+		}
 	});
 }

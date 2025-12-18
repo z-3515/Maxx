@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.2
+// @version      3.4
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -59,8 +59,8 @@
         priority: 100,
         url: (q) => `https://www.virustotal.com/gui/search/${q}`,
         match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
-        condition: (text) => {
-          return isHash(text) || isIP(text) || isDomain(text);
+        condition: (text, { isHash: isHash2, isIP: isIP2, isDomain: isDomain2 }) => {
+          return isHash2(text) || isIP2(text) || isDomain2(text);
         }
       },
       google: {
@@ -82,13 +82,13 @@
       return regex.test(url);
     });
   }
-  function isIP2(text) {
+  function isIP(text) {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(text);
   }
-  function isDomain2(text) {
+  function isDomain(text) {
     return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(text);
   }
-  function isHash2(text) {
+  function isHash(text) {
     return /^[a-f0-9]{32}$/i.test(text) || /^[a-f0-9]{40}$/i.test(text) || /^[a-f0-9]{64}$/i.test(text);
   }
   function selectedSearch(ctx) {
@@ -160,7 +160,11 @@
         if (engine.match && !isMatch(url, engine.match)) return false;
         if (engine.exclude && isMatch(url, engine.exclude)) return false;
         if (typeof engine.condition === "function") {
-          if (!engine.condition(text, { isIP: isIP2, isDomain: isDomain2, isHash: isHash2 })) {
+          if (!engine.condition(text, {
+            isIP,
+            isDomain,
+            isHash
+          })) {
             return false;
           }
         }
@@ -213,6 +217,12 @@
     });
     document.addEventListener("mousedown", (e) => {
       if (!box.contains(e.target)) hide();
+    });
+    document.addEventListener("selectionchange", () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        hide();
+      }
     });
   }
 

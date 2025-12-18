@@ -23,7 +23,7 @@ export default {
 
 			match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
 
-			condition: (text) => {
+			condition: (text, { isHash, isIP, isDomain }) => {
 				return isHash(text) || isIP(text) || isDomain(text);
 			},
 		},
