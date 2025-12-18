@@ -26,40 +26,45 @@ function walk(dir, files = []) {
 	return files;
 }
 
-function extractModuleName(configPath) {
-	const content = fs.readFileSync(configPath, "utf8");
-	const match = content.match(/name\s*:\s*["'`](.+?)["'`]/);
+function extractModuleName(content) {
+	const match = content.match(/name\s*:\s*["'`](.+?)["'`]\s*,?/);
 	return match ? match[1].trim() : null;
 }
 
 /**
- * Patch base64 marker vào config.js
- * - chỉ chèn 1 lần
- * - chỉ sửa comment FEATURE CONFIG
+ * Patch base64 marker ngay dưới dòng `name:`
+ * - chỉ patch 1 lần
+ * - không phụ thuộc FEATURE CONFIG
  */
-function patchConfigWithBase64(configPath, moduleName) {
+function patchConfigWithBase64(configPath) {
 	const content = fs.readFileSync(configPath, "utf8");
-	const b64 = encodeBase64(moduleName);
+	const name = extractModuleName(content);
+	if (!name) return;
 
-	// đã có rồi → bỏ qua
+	const b64 = encodeBase64(name);
+
+	// đã có module-id rồi → bỏ qua
 	if (content.includes(b64)) return;
 
-	// tìm block FEATURE CONFIG
-	const featureBlockRegex = /(\/\*\s*={5,}\s*FEATURE CONFIG[\s\S]*?\n)(\s*={5,}\s*\*\/)/i;
+	const lines = content.split("\n");
+	let patched = false;
 
-	const match = content.match(featureBlockRegex);
-	if (!match) {
-		console.warn(`⚠️ Không tìm thấy FEATURE CONFIG trong ${configPath}`);
-		return;
+	for (let i = 0; i < lines.length; i++) {
+		if (/^\s*name\s*:\s*["'`]/.test(lines[i])) {
+			// chèn ngay sau name
+			lines.splice(i + 1, 0, `\t// module-id: ${b64}`);
+			patched = true;
+			break;
+		}
 	}
 
-	const injected = `${match[1]}        ${b64}
-${match[2]}`;
+	if (!patched) return;
 
-	const patched = content.replace(featureBlockRegex, injected);
+	fs.writeFileSync(configPath, lines.join("\n"), {
+		encoding: "utf8",
+	});
 
-	fs.writeFileSync(configPath, patched, { encoding: "utf8" });
-	console.log(`🧩 Inject base64 → ${configPath}`);
+	console.log(`🧩 Patch module-id → ${configPath}`);
 }
 
 /* ===============================
@@ -88,21 +93,22 @@ meta = meta.replace(versionRegex, `@version      ${newVersion}`);
 fs.writeFileSync(META_FILE, meta, { encoding: "utf8" });
 
 /* ===============================
-   3) COLLECT + PATCH MODULE CONFIG
+   3) PATCH CONFIG + COLLECT META
 ================================ */
 const moduleConfigs = walk(MODULE_DIR);
 const moduleMetaLines = [];
 
 for (const cfg of moduleConfigs) {
-	const name = extractModuleName(cfg);
+	const content = fs.readFileSync(cfg, "utf8");
+	const name = extractModuleName(content);
 	if (!name) continue;
 
 	const b64 = encodeBase64(name);
 
-	// 🔧 PATCH CONFIG.JS (COMMENT ONLY)
-	patchConfigWithBase64(cfg, name);
+	// 🔧 patch config.js
+	patchConfigWithBase64(cfg);
 
-	// 🏷 METADATA LINE
+	// 🏷 userscript metadata
 	moduleMetaLines.push(`// module: ${name} | ${b64}`);
 }
 
@@ -126,7 +132,7 @@ esbuild
 		const output = result.outputFiles[0].text;
 
 		/* ===============================
-		   5) INJECT MODULE METADATA
+		   5) INJECT MODULE META
 		================================ */
 		const metaLines = meta.split("\n");
 		const endIndex = metaLines.findIndex((l) => l.includes("==/UserScript=="));
