@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.5
+// @version      3.6
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -70,6 +70,42 @@
         url: (q) => `https://www.google.com/search?q=${q}`,
         match: ["*://*/*"],
         condition: () => true
+      },
+      // AlienVault OTX engine
+      otx: {
+        label: "OTX",
+        class: "mx-otx",
+        priority: 90,
+        url: (q) => `https://otx.alienvault.com/indicator/${q}`,
+        match: ["*://*/*"],
+        condition: (t, { isIP: isIP2, isDomain: isDomain2, isHash: isHash2 }) => isIP2(t) || isDomain2(t) || isHash2(t)
+      },
+      // Hybrid Analysis engine
+      ha: {
+        label: "HA",
+        class: "mx-ha",
+        priority: 85,
+        url: (q) => `https://www.hybrid-analysis.com/search?query=${q}`,
+        match: ["*://*/*"],
+        condition: (t, { isHash: isHash2 }) => isHash2(t)
+      },
+      // MalwareBazaar engine
+      mb: {
+        label: "MB",
+        class: "mx-mb",
+        priority: 80,
+        url: (q) => `https://bazaar.abuse.ch/browse.php?search=${q}`,
+        match: ["*://*/*"],
+        condition: (t, { isHash: isHash2 }) => isHash2(t)
+      },
+      // Whois Lookup engine
+      whois: {
+        label: "WHO",
+        class: "mx-whois",
+        priority: 40,
+        url: (q) => `https://www.viewdns.info/whois/?domain=${q}`,
+        match: ["*://*/*"],
+        condition: (t, { isDomain: isDomain2 }) => isDomain2(t)
       }
     }
   };

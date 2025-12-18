@@ -39,5 +39,45 @@ export default {
 
 			condition: () => true,
 		},
+
+		// AlienVault OTX engine
+		otx: {
+			label: "OTX",
+			class: "mx-otx",
+			priority: 90,
+			url: (q) => `https://otx.alienvault.com/indicator/${q}`,
+			match: ["*://*/*"],
+			condition: (t, { isIP, isDomain, isHash }) => isIP(t) || isDomain(t) || isHash(t),
+		},
+
+		// Hybrid Analysis engine
+		ha: {
+			label: "HA",
+			class: "mx-ha",
+			priority: 85,
+			url: (q) => `https://www.hybrid-analysis.com/search?query=${q}`,
+			match: ["*://*/*"],
+			condition: (t, { isHash }) => isHash(t),
+		},
+
+		// MalwareBazaar engine
+		mb: {
+			label: "MB",
+			class: "mx-mb",
+			priority: 80,
+			url: (q) => `https://bazaar.abuse.ch/browse.php?search=${q}`,
+			match: ["*://*/*"],
+			condition: (t, { isHash }) => isHash(t),
+		},
+
+		// Whois Lookup engine
+		whois: {
+			label: "WHO",
+			class: "mx-whois",
+			priority: 40,
+			url: (q) => `https://www.viewdns.info/whois/?domain=${q}`,
+			match: ["*://*/*"],
+			condition: (t, { isDomain }) => isDomain(t),
+		},
 	},
 };
