@@ -3,6 +3,7 @@ export default {
 	        MODULE META
 	========================== */
 	name: "offense-whitelist-highlighter module",
+	// module-id: b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 
 	enabled: true,
 

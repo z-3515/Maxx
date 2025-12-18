@@ -1,5 +1,6 @@
 export default {
 	name: "test-module",
+	// module-id: dGVzdC1tb2R1bGU=
 
 	enabled: true, // 🔥 bật / tắt nhanh
 

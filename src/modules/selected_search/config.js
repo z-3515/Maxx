@@ -1,5 +1,6 @@
 export default {
 	name: "selected-search module",
+	// module-id: c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
 
 	enabled: true,
 

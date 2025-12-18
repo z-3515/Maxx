@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      2.20
+// @version      3.2
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -12,8 +12,8 @@
 // @downloadURL  https://raw.githubusercontent.com/z-3515/Maxx/main/dist/maxx.user.js
 // ==/UserScript==
 
-// module: offense-whitelist-highlighter module | b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 // module: selected-search module | c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
+// module: offense-whitelist-highlighter module | b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 // module: test-module | dGVzdC1tb2R1bGU=
 
 
@@ -25,6 +25,7 @@
   // src/modules/test/config.js
   var config_default = {
     name: "test-module",
+    // module-id: dGVzdC1tb2R1bGU=
     enabled: true,
     // 🔥 bật / tắt nhanh
     match: ["*://*.google.com/*", "*://localhost/*"],
@@ -39,115 +40,151 @@
     // số lớn chạy trước (dùng khi tool phụ thuộc nhau)
   };
 
-  // src/modules/soc/siem/selected_search/config.js
+  // src/modules/selected_search/config.js
   var config_default2 = {
-    /* ==========================
-            MODULE META
-    ========================== */
     name: "selected-search module",
+    // module-id: c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
     enabled: true,
-    match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
-    exclude: [],
-    runAt: "document-end",
+    match: ["*://*/*"],
     iframe: true,
-    once: true,
-    priority: 10,
-    /* ==========================
-            FEATURE CONFIG
-       c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
-    ========================== */
     ui: {
       offsetX: 8,
       offsetY: -10,
-      zIndex: 999999,
-      animation: true
+      zIndex: 999999
     },
     engines: {
-      google: {
-        label: "G",
-        url: (q) => `https://www.google.com/search?q=${q}`,
-        class: "mx-google"
-      },
       vt: {
         label: "VT",
+        class: "mx-vt",
+        priority: 100,
         url: (q) => `https://www.virustotal.com/gui/search/${q}`,
-        class: "mx-vt"
+        match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
+        condition: (text) => {
+          return isHash(text) || isIP(text) || isDomain(text);
+        }
+      },
+      google: {
+        label: "G",
+        class: "mx-google",
+        priority: 10,
+        url: (q) => `https://www.google.com/search?q=${q}`,
+        match: ["*://*/*"],
+        condition: () => true
       }
     }
   };
 
-  // src/modules/soc/siem/selected_search/index.js
+  // src/modules/selected_search/index.js
+  function isMatch(url, patterns = []) {
+    if (!patterns || patterns.length === 0) return true;
+    return patterns.some((p) => {
+      const regex = new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+      return regex.test(url);
+    });
+  }
+  function isIP2(text) {
+    return /^(\d{1,3}\.){3}\d{1,3}$/.test(text);
+  }
+  function isDomain2(text) {
+    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(text);
+  }
+  function isHash2(text) {
+    return /^[a-f0-9]{32}$/i.test(text) || /^[a-f0-9]{40}$/i.test(text) || /^[a-f0-9]{64}$/i.test(text);
+  }
   function selectedSearch(ctx) {
     if (!config_default2.enabled) return;
     const { engines, ui } = config_default2;
-    const style = document.createElement("style");
-    style.textContent = `
-		.mx-search-box {
-			position: fixed;
-			display: flex;
-			gap: 6px;
-			padding: 6px;
-			background: rgba(15,23,42,.85);
-			backdrop-filter: blur(6px);
-			border-radius: 999px;
-			box-shadow: 0 10px 30px rgba(0,0,0,.4);
-			transform: scale(.6);
-			opacity: 0;
-			pointer-events: none;
-			transition: all .2s cubic-bezier(.25,.8,.25,1);
-			z-index: ${ui?.zIndex ?? 999999};
-		}
+    const url = ctx?.url || location.href;
+    if (!document.getElementById("mx-selected-search-style")) {
+      const style = document.createElement("style");
+      style.id = "mx-selected-search-style";
+      style.textContent = `
+			.mx-search-box {
+				position: fixed;
+				display: flex;
+				gap: 6px;
+				padding: 6px;
+				background: rgba(15,23,42,.85);
+				backdrop-filter: blur(6px);
+				border-radius: 999px;
+				box-shadow: 0 10px 30px rgba(0,0,0,.4);
+				transform: scale(.6);
+				opacity: 0;
+				pointer-events: none;
+				transition: all .2s cubic-bezier(.25,.8,.25,1);
+				z-index: ${ui?.zIndex ?? 999999};
+			}
 
-		.mx-search-box.show {
-			transform: scale(1);
-			opacity: 1;
-			pointer-events: auto;
-		}
+			.mx-search-box.show {
+				transform: scale(1);
+				opacity: 1;
+				pointer-events: auto;
+			}
 
-		.mx-btn {
-			width: 34px;
-			height: 34px;
-			border-radius: 50%;
-			display: grid;
-			place-items: center;
-			cursor: pointer;
-			font-weight: 700;
-			font-size: 13px;
-			color: #fff;
-			user-select: none;
-			transition: all .2s ease;
-		}
+			.mx-btn {
+				width: 34px;
+				height: 34px;
+				border-radius: 50%;
+				display: grid;
+				place-items: center;
+				cursor: pointer;
+				font-weight: 700;
+				font-size: 13px;
+				color: #fff;
+				user-select: none;
+				transition: all .2s ease;
+			}
 
-		.mx-btn:hover {
-			transform: scale(1.15) rotate(6deg);
-			box-shadow: 0 0 12px currentColor;
-		}
+			.mx-btn:hover {
+				transform: scale(1.15) rotate(6deg);
+				box-shadow: 0 0 12px currentColor;
+			}
 
-		.mx-google {
-			background: radial-gradient(circle,#60a5fa,#2563eb);
-		}
+			.mx-google {
+				background: radial-gradient(circle,#60a5fa,#2563eb);
+			}
 
-		.mx-vt {
-			background: radial-gradient(circle,#34d399,#059669);
-		}
-	`;
-    document.head.appendChild(style);
+			.mx-vt {
+				background: radial-gradient(circle,#34d399,#059669);
+			}
+		`;
+      document.head.appendChild(style);
+    }
     const box = document.createElement("div");
     box.className = "mx-search-box";
-    let selectedText = "";
-    Object.values(engines).forEach((engine) => {
-      const btn = document.createElement("div");
-      btn.className = `mx-btn ${engine.class}`;
-      btn.textContent = engine.label;
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!selectedText) return;
-        window.open(engine.url(encodeURIComponent(selectedText)), "_blank");
-        hide();
-      });
-      box.appendChild(btn);
-    });
     document.body.appendChild(box);
+    let selectedText = "";
+    let lastEngineKey = "";
+    function getActiveEngines(text) {
+      return Object.values(engines).filter((engine) => {
+        if (engine.match && !isMatch(url, engine.match)) return false;
+        if (engine.exclude && isMatch(url, engine.exclude)) return false;
+        if (typeof engine.condition === "function") {
+          if (!engine.condition(text, { isIP: isIP2, isDomain: isDomain2, isHash: isHash2 })) {
+            return false;
+          }
+        }
+        return true;
+      }).sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    }
+    function renderButtons(activeEngines) {
+      const key = activeEngines.map((e) => e.label).join("|");
+      if (key === lastEngineKey) return;
+      lastEngineKey = key;
+      box.innerHTML = "";
+      activeEngines.forEach((engine) => {
+        const btn = document.createElement("div");
+        btn.className = `mx-btn ${engine.class || ""}`;
+        btn.textContent = engine.label;
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!selectedText) return;
+          window.open(engine.url(encodeURIComponent(selectedText)), "_blank");
+          hide();
+        });
+        box.appendChild(btn);
+      });
+    }
     function show(rect) {
       box.style.left = rect.right + (ui?.offsetX ?? 8) + "px";
       box.style.top = rect.top + (ui?.offsetY ?? -10) + "px";
@@ -156,6 +193,7 @@
     function hide() {
       box.classList.remove("show");
       selectedText = "";
+      lastEngineKey = "";
     }
     document.addEventListener("mouseup", () => {
       const sel = window.getSelection();
@@ -163,6 +201,9 @@
       const text = sel.toString().trim();
       if (!text) return hide();
       selectedText = text;
+      const activeEngines = getActiveEngines(text);
+      if (activeEngines.length === 0) return hide();
+      renderButtons(activeEngines);
       try {
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         if (rect.width || rect.height) show(rect);
@@ -181,6 +222,7 @@
             MODULE META
     ========================== */
     name: "offense-whitelist-highlighter module",
+    // module-id: b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
     enabled: true,
     match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
     exclude: [],
@@ -188,10 +230,6 @@
     iframe: true,
     once: true,
     priority: 10,
-    /* ==========================
-            FEATURE CONFIG
-           b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
-    ========================== */
     selector: {
       frameName: "PAGE_SEM",
       table: "#tableSection table#defaultTable",
@@ -358,7 +396,7 @@
   function wildcardToRegExp(pattern) {
     return new RegExp("^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
   }
-  function isMatch(url, patterns = []) {
+  function isMatch2(url, patterns = []) {
     return patterns.some((p) => wildcardToRegExp(p).test(url));
   }
 
@@ -368,8 +406,8 @@
     const isIframe = window.self !== window.top;
     registry_default.filter(({ config }) => config.enabled).sort((a, b) => (b.config.priority || 0) - (a.config.priority || 0)).forEach(({ run, config }) => {
       if (config.iframe === false && isIframe) return;
-      if (config.match && !isMatch(url, config.match)) return;
-      if (config.exclude && isMatch(url, config.exclude)) return;
+      if (config.match && !isMatch2(url, config.match)) return;
+      if (config.exclude && isMatch2(url, config.exclude)) return;
       try {
         run({
           url,
