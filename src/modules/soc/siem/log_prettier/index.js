@@ -1,20 +1,11 @@
 import config from "./config.js";
 import { waitForIframe, waitForIframeDocument, watchElement } from "../helper/siemObserver.js";
-import { hookDomapi } from "../helper/domapi.js";
 
 /* ==================================================
    DEBUG
 ================================================== */
 const TAG = "[log-prettier]";
 const log = (...a) => console.log(TAG, ...a);
-
-/* ==================================================
-   MODULE STATE (persist during lifecycle)
-================================================== */
-const state = {
-	tabSet: null,
-	tabInjected: false,
-};
 
 /* ==================================================
    STYLE
@@ -26,35 +17,43 @@ function injectStyle(doc) {
 	const style = doc.createElement("style");
 	style.id = "mx-log-prettier-style";
 	style.textContent = `
-		.mx-pretty-wrapper { margin-top: 8px; }
 		.mx-pretty-block {
 			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 			font-size: 13px;
 			line-height: 1.6;
-			padding: 10px;
-			background: #f8fafc;
-			border-radius: 6px;
-			overflow: auto;
+			padding: 8px;
 		}
-		.mx-row { display: flex; gap: 12px; padding: 2px 0; }
+
+		.mx-row {
+			display: flex;
+			gap: 12px;
+			padding: 2px 0;
+		}
+
 		.mx-key {
 			min-width: 220px;
 			color: #475569;
 			font-weight: 600;
 			white-space: nowrap;
 		}
-		.mx-val { color: #0f172a; word-break: break-all; }
+
+		.mx-val {
+			color: #0f172a;
+			word-break: break-all;
+		}
+
 		.mx-divider {
 			margin: 8px 0;
 			border: none;
 			border-top: 1px solid rgba(148,163,184,.4);
 		}
+
 		.mx-raw summary {
 			cursor: pointer;
 			color: #2563eb;
 			font-weight: 600;
-			margin-bottom: 6px;
 		}
+
 		.mx-ip-public {
 			color: #dc2626;
 			font-weight: 700;
@@ -62,6 +61,7 @@ function injectStyle(doc) {
 			border-radius: 4px;
 			padding: 0 3px;
 		}
+
 		.mx-ip-private {
 			color: #2563eb;
 			font-weight: 700;
@@ -69,17 +69,11 @@ function injectStyle(doc) {
 			border-radius: 4px;
 			padding: 0 3px;
 		}
+
 		.mx-ip-loopback {
 			color: #64748b;
 			font-weight: 600;
 			background: rgba(100,116,139,.12);
-			border-radius: 4px;
-			padding: 0 3px;
-		}
-		.mx-ip-invalid {
-			color: #7c3aed;
-			font-weight: 600;
-			background: rgba(124,58,237,.1);
 			border-radius: 4px;
 			padding: 0 3px;
 		}
@@ -105,8 +99,7 @@ function getIPType(ip) {
 
 function highlightIP(text) {
 	return text.replace(IP_REGEX, (ip) => {
-		const type = getIPType(ip);
-		return `<span class="mx-ip-${type}">${ip}</span>`;
+		return `<span class="mx-ip-${getIPType(ip)}">${ip}</span>`;
 	});
 }
 
@@ -156,21 +149,53 @@ function renderPretty(rawText) {
 }
 
 /* ==================================================
-   TABSET HANDLER
+   TAB / PAGE HANDLER (DOM LEVEL – SIEM SAFE)
 ================================================== */
-function ensureMaxxTab(tabSet, containerId) {
-	try {
-		if (!state.tabInjected) {
-			try {
-				tabSet.addPage({ text: "maxx", type: "DIV", index: 0 });
-			} catch {}
-			state.tabInjected = true;
-		}
-		tabSet.assignElement({ id: containerId, index: 0 });
-		tabSet.setIndex(0);
-	} catch (e) {
-		console.warn("[log-prettier] tab error", e);
+function ensureMaxxTab(tabHeader) {
+	if (tabHeader.querySelector("li[data-mx='maxx']")) return;
+
+	const li = document.createElement("li");
+	li.className = "DA_TAB DA_TAB_RIGHTEND";
+	li.dataset.mx = "maxx";
+
+	const span = document.createElement("span");
+	span.textContent = "maxx";
+	li.appendChild(span);
+
+	tabHeader.appendChild(li);
+}
+
+function ensureMaxxPage(notebook, html) {
+	let page = notebook.querySelector(".DA_NOTEBOOKPAGE[data-mx='maxx']");
+	if (!page) {
+		page = document.createElement("div");
+		page.className = "DA_NOTEBOOKPAGE";
+		page.dataset.mx = "maxx";
+		page.style.cssText = `
+			display: none;
+			height: 100%;
+			overflow: auto;
+			padding: 4px;
+		`;
+		notebook.appendChild(page);
 	}
+	page.innerHTML = html;
+	return page;
+}
+
+function wireTabSwitch(tabHeader, notebook) {
+	const tabs = Array.from(tabHeader.children);
+	const pages = Array.from(notebook.children);
+
+	tabs.forEach((tab, idx) => {
+		tab.onclick = () => {
+			tabs.forEach((t) => t.classList.remove("DA_TAB_SELECTED"));
+			tab.classList.add("DA_TAB_SELECTED");
+
+			pages.forEach((p) => (p.style.display = "none"));
+			if (pages[idx]) pages[idx].style.display = "block";
+		};
+	});
 }
 
 /* ==================================================
@@ -186,37 +211,22 @@ export default function logPrettier(ctx) {
 		waitForIframeDocument(iframe, (doc) => {
 			log("iframe document ready");
 
-			const win = iframe.contentWindow;
-
-			/* -------- domapi hook (tabset) -------- */
-			hookDomapi(win, (tabSet) => {
-				state.tabSet = tabSet;
-				log("tabSet captured");
-
-				const el = doc.querySelector(".mx-pretty-wrapper");
-				if (el) ensureMaxxTab(tabSet, el.id);
-			});
-
-			/* -------- rawlog observer -------- */
 			watchElement(doc, `${config.selector.rawlogContainer} ${config.selector.rawlogPre}`, (rawPre, rawText) => {
 				injectStyle(doc);
 
-				const widget = rawPre.closest(config.selector.rawlogContainer);
+				const widget = rawPre.closest("div.binaryWidget");
 				if (!widget) return;
 
-				let box = widget.querySelector(".mx-pretty-wrapper");
-				if (!box) {
-					box = doc.createElement("div");
-					box.className = "mx-pretty-wrapper";
-					box.id = "mx_pretty_container";
-					widget.appendChild(box);
-				}
+				const tabHeader = widget.querySelector("ul.DA_ROW");
+				const notebook = widget.querySelector(".DA_NOTEBOOK");
+				if (!tabHeader || !notebook) return;
 
-				box.innerHTML = renderPretty(rawText);
+				ensureMaxxTab(tabHeader);
 
-				if (state.tabSet) {
-					ensureMaxxTab(state.tabSet, box.id);
-				}
+				const html = renderPretty(rawText);
+				ensureMaxxPage(notebook, html);
+
+				wireTabSwitch(tabHeader, notebook);
 			});
 		});
 	});

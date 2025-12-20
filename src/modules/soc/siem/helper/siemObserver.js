@@ -8,6 +8,14 @@
 /* ================= iframe ================= */
 
 export function waitForIframe(targets, callback) {
+	// 🔑 CASE 1: script đang chạy bên trong iframe target
+	const fe = window.frameElement;
+	if (fe && (targets.includes(fe.id) || targets.includes(fe.name))) {
+		callback(fe);
+		return;
+	}
+
+	// 🔑 CASE 2: script đang chạy ở top window
 	const match = (iframe) => targets.includes(iframe.id) || targets.includes(iframe.name);
 
 	const scan = () => {

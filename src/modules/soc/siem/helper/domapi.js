@@ -2,34 +2,44 @@
  * domapi helper – capture Pagecontrol safely
  * SIEM-safe: capture every time Pagecontrol is called
  */
-
 export function hookDomapi(win, onTabSet) {
-	if (!win) return false;
+	if (!win || !win.domapi) return false;
 
 	try {
 		const domapi = win.domapi;
-		if (!domapi || typeof domapi.Pagecontrol !== "function") return false;
 
-		// hook 1 lần / window
+		/* ===== 1️⃣ BẮT PAGECONTROL ĐÃ TỒN TẠI ===== */
+		for (const k in win) {
+			const v = win[k];
+			if (
+				v &&
+				typeof v === "object" &&
+				typeof v.addPage === "function" &&
+				typeof v.assignElement === "function" &&
+				typeof v.setIndex === "function"
+			) {
+				onTabSet(v);
+				return true;
+			}
+		}
+
+		/* ===== 2️⃣ HOOK CHO PAGECONTROL TẠO SAU ===== */
 		if (!domapi.__mx_hooked) {
 			domapi.__mx_hooked = true;
-			domapi.__mx_orig_Pagecontrol = domapi.Pagecontrol;
+			const orig = domapi.Pagecontrol;
 
 			domapi.Pagecontrol = function (...args) {
-				const pc = domapi.__mx_orig_Pagecontrol.apply(this, args);
-
+				const pc = orig.apply(this, args);
 				try {
-					if (pc && typeof pc.addPage === "function" && typeof pc.assignElement === "function" && typeof pc.setIndex === "function") {
-						onTabSet(pc);
-					}
+					onTabSet(pc);
 				} catch {}
-
 				return pc;
 			};
 		}
 
 		return true;
-	} catch {
+	} catch (e) {
+		console.warn("[log-prettier] hookDomapi failed", e);
 		return false;
 	}
 }

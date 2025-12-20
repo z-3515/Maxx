@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.16
+// @version      3.23
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -483,6 +483,11 @@
 
   // src/modules/soc/siem/helper/siemObserver.js
   function waitForIframe(targets, callback) {
+    const fe = window.frameElement;
+    if (fe && (targets.includes(fe.id) || targets.includes(fe.name))) {
+      callback(fe);
+      return;
+    }
     const match = (iframe) => targets.includes(iframe.id) || targets.includes(iframe.name);
     const scan = () => {
       const iframes = document.querySelectorAll("iframe");
@@ -540,74 +545,52 @@
     return obs;
   }
 
-  // src/modules/soc/siem/helper/domapi.js
-  function hookDomapi(win, onTabSet) {
-    if (!win) return false;
-    try {
-      const domapi = win.domapi;
-      if (!domapi || typeof domapi.Pagecontrol !== "function") return false;
-      if (!domapi.__mx_hooked) {
-        domapi.__mx_hooked = true;
-        domapi.__mx_orig_Pagecontrol = domapi.Pagecontrol;
-        domapi.Pagecontrol = function(...args) {
-          const pc = domapi.__mx_orig_Pagecontrol.apply(this, args);
-          try {
-            if (pc && typeof pc.addPage === "function" && typeof pc.assignElement === "function" && typeof pc.setIndex === "function") {
-              onTabSet(pc);
-            }
-          } catch {
-          }
-          return pc;
-        };
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   // src/modules/soc/siem/log_prettier/index.js
   var TAG = "[log-prettier]";
   var log = (...a) => console.log(TAG, ...a);
-  var state = {
-    tabSet: null,
-    tabInjected: false
-  };
   function injectStyle(doc) {
     if (!doc || !doc.head) return;
     if (doc.getElementById("mx-log-prettier-style")) return;
     const style = doc.createElement("style");
     style.id = "mx-log-prettier-style";
     style.textContent = `
-		.mx-pretty-wrapper { margin-top: 8px; }
 		.mx-pretty-block {
 			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 			font-size: 13px;
 			line-height: 1.6;
-			padding: 10px;
-			background: #f8fafc;
-			border-radius: 6px;
-			overflow: auto;
+			padding: 8px;
 		}
-		.mx-row { display: flex; gap: 12px; padding: 2px 0; }
+
+		.mx-row {
+			display: flex;
+			gap: 12px;
+			padding: 2px 0;
+		}
+
 		.mx-key {
 			min-width: 220px;
 			color: #475569;
 			font-weight: 600;
 			white-space: nowrap;
 		}
-		.mx-val { color: #0f172a; word-break: break-all; }
+
+		.mx-val {
+			color: #0f172a;
+			word-break: break-all;
+		}
+
 		.mx-divider {
 			margin: 8px 0;
 			border: none;
 			border-top: 1px solid rgba(148,163,184,.4);
 		}
+
 		.mx-raw summary {
 			cursor: pointer;
 			color: #2563eb;
 			font-weight: 600;
-			margin-bottom: 6px;
 		}
+
 		.mx-ip-public {
 			color: #dc2626;
 			font-weight: 700;
@@ -615,6 +598,7 @@
 			border-radius: 4px;
 			padding: 0 3px;
 		}
+
 		.mx-ip-private {
 			color: #2563eb;
 			font-weight: 700;
@@ -622,17 +606,11 @@
 			border-radius: 4px;
 			padding: 0 3px;
 		}
+
 		.mx-ip-loopback {
 			color: #64748b;
 			font-weight: 600;
 			background: rgba(100,116,139,.12);
-			border-radius: 4px;
-			padding: 0 3px;
-		}
-		.mx-ip-invalid {
-			color: #7c3aed;
-			font-weight: 600;
-			background: rgba(124,58,237,.1);
 			border-radius: 4px;
 			padding: 0 3px;
 		}
@@ -652,8 +630,7 @@
   }
   function highlightIP(text) {
     return text.replace(IP_REGEX, (ip) => {
-      const type = getIPType(ip);
-      return `<span class="mx-ip-${type}">${ip}</span>`;
+      return `<span class="mx-ip-${getIPType(ip)}">${ip}</span>`;
     });
   }
   function escapeHtml(s) {
@@ -693,20 +670,44 @@
 		</div>
 	`;
   }
-  function ensureMaxxTab(tabSet, containerId) {
-    try {
-      if (!state.tabInjected) {
-        try {
-          tabSet.addPage({ text: "maxx", type: "DIV", index: 0 });
-        } catch {
-        }
-        state.tabInjected = true;
-      }
-      tabSet.assignElement({ id: containerId, index: 0 });
-      tabSet.setIndex(0);
-    } catch (e) {
-      console.warn("[log-prettier] tab error", e);
+  function ensureMaxxTab(tabHeader) {
+    if (tabHeader.querySelector("li[data-mx='maxx']")) return;
+    const li = document.createElement("li");
+    li.className = "DA_TAB DA_TAB_RIGHTEND";
+    li.dataset.mx = "maxx";
+    const span = document.createElement("span");
+    span.textContent = "maxx";
+    li.appendChild(span);
+    tabHeader.appendChild(li);
+  }
+  function ensureMaxxPage(notebook, html) {
+    let page = notebook.querySelector(".DA_NOTEBOOKPAGE[data-mx='maxx']");
+    if (!page) {
+      page = document.createElement("div");
+      page.className = "DA_NOTEBOOKPAGE";
+      page.dataset.mx = "maxx";
+      page.style.cssText = `
+			display: none;
+			height: 100%;
+			overflow: auto;
+			padding: 4px;
+		`;
+      notebook.appendChild(page);
     }
+    page.innerHTML = html;
+    return page;
+  }
+  function wireTabSwitch(tabHeader, notebook) {
+    const tabs = Array.from(tabHeader.children);
+    const pages = Array.from(notebook.children);
+    tabs.forEach((tab, idx) => {
+      tab.onclick = () => {
+        tabs.forEach((t) => t.classList.remove("DA_TAB_SELECTED"));
+        tab.classList.add("DA_TAB_SELECTED");
+        pages.forEach((p) => p.style.display = "none");
+        if (pages[idx]) pages[idx].style.display = "block";
+      };
+    });
   }
   function logPrettier(ctx) {
     if (!config_default4.enabled) return;
@@ -715,28 +716,17 @@
       log("iframe found:", iframe.id || iframe.name);
       waitForIframeDocument(iframe, (doc) => {
         log("iframe document ready");
-        const win = iframe.contentWindow;
-        hookDomapi(win, (tabSet) => {
-          state.tabSet = tabSet;
-          log("tabSet captured");
-          const el = doc.querySelector(".mx-pretty-wrapper");
-          if (el) ensureMaxxTab(tabSet, el.id);
-        });
         watchElement(doc, `${config_default4.selector.rawlogContainer} ${config_default4.selector.rawlogPre}`, (rawPre, rawText) => {
           injectStyle(doc);
-          const widget = rawPre.closest(config_default4.selector.rawlogContainer);
+          const widget = rawPre.closest("div.binaryWidget");
           if (!widget) return;
-          let box = widget.querySelector(".mx-pretty-wrapper");
-          if (!box) {
-            box = doc.createElement("div");
-            box.className = "mx-pretty-wrapper";
-            box.id = "mx_pretty_container";
-            widget.appendChild(box);
-          }
-          box.innerHTML = renderPretty(rawText);
-          if (state.tabSet) {
-            ensureMaxxTab(state.tabSet, box.id);
-          }
+          const tabHeader = widget.querySelector("ul.DA_ROW");
+          const notebook = widget.querySelector(".DA_NOTEBOOK");
+          if (!tabHeader || !notebook) return;
+          ensureMaxxTab(tabHeader);
+          const html = renderPretty(rawText);
+          ensureMaxxPage(notebook, html);
+          wireTabSwitch(tabHeader, notebook);
         });
       });
     });
@@ -772,8 +762,8 @@
 
   // src/index.js
   function bootstrap() {
-    const url = location.href;
     const isIframe = window.self !== window.top;
+    const url = isIframe ? window.top.location.href : location.href;
     registry_default.filter(({ config }) => config.enabled).sort((a, b) => (b.config.priority || 0) - (a.config.priority || 0)).forEach(({ run, config }) => {
       if (config.iframe === false && isIframe) return;
       if (config.match && !isMatch2(url, config.match)) return;
