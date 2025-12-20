@@ -2,8 +2,8 @@ import registry from "./registry.js";
 import { isMatch } from "./helper/match.js";
 
 function bootstrap() {
-	const url = location.href;
 	const isIframe = window.self !== window.top;
+	const url = isIframe ? window.top.location.href : location.href;
 
 	registry
 		.filter(({ config }) => config.enabled)
