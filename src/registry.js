@@ -7,6 +7,9 @@ import selectedSearchConfig from "./modules/selected_search/config.js";
 import offenseWhitelistHighlighter from "./modules/soc/siem/offense_whitelist_highlighter/index.js";
 import offenseWhitelistHighlighterConfig from "./modules/soc/siem/offense_whitelist_highlighter/config.js";
 
+import logPrettier from "./modules/soc/siem/log_prettier/index.js";
+import logPrettierConfig from "./modules/soc/siem/log_prettier/config.js";
+
 export default [
 	{
 		run: test,
@@ -19,5 +22,9 @@ export default [
 	{
 		run: offenseWhitelistHighlighter,
 		config: offenseWhitelistHighlighterConfig,
+	},
+	{
+		run: logPrettier,
+		config: logPrettierConfig,
 	},
 ];

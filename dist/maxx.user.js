@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.8
+// @version      3.16
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -13,6 +13,7 @@
 // ==/UserScript==
 
 // module: selected-search module | c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
+// module: log-prettier module | bG9nLXByZXR0aWVyIG1vZHVsZQ==
 // module: offense-whitelist-highlighter module | b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 // module: test-module | dGVzdC1tb2R1bGU=
 
@@ -462,6 +463,285 @@
     }, 500);
   }
 
+  // src/modules/soc/siem/log_prettier/config.js
+  var config_default4 = {
+    name: "log-prettier module",
+    // module-id: bG9nLXByZXR0aWVyIG1vZHVsZQ==
+    enabled: true,
+    match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
+    exclude: [],
+    runAt: "document-end",
+    iframe: true,
+    once: false,
+    priority: 10,
+    selector: {
+      frameTarget: ["PAGE_EVENTVIEWER", "mainPage"],
+      rawlogContainer: "div.binaryWidget",
+      rawlogPre: "pre.utf"
+    }
+  };
+
+  // src/modules/soc/siem/helper/siemObserver.js
+  function waitForIframe(targets, callback) {
+    const match = (iframe) => targets.includes(iframe.id) || targets.includes(iframe.name);
+    const scan = () => {
+      const iframes = document.querySelectorAll("iframe");
+      for (const iframe of iframes) {
+        if (match(iframe)) {
+          callback(iframe);
+          return true;
+        }
+      }
+      return false;
+    };
+    if (scan()) return;
+    const obs = new MutationObserver(() => {
+      if (scan()) obs.disconnect();
+    });
+    obs.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+  function waitForIframeDocument(iframe, callback) {
+    const attach = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (doc && doc.body) {
+          callback(doc);
+          return true;
+        }
+      } catch {
+      }
+      return false;
+    };
+    if (attach()) return;
+    iframe.addEventListener("load", () => {
+      attach();
+    });
+  }
+  function watchElement(doc, selector, onChange) {
+    let lastText = null;
+    const scan = () => {
+      const el = doc.querySelector(selector);
+      if (!el) return;
+      const text = el.textContent || "";
+      if (text === lastText) return;
+      lastText = text;
+      onChange(el, text);
+    };
+    scan();
+    const obs = new MutationObserver(scan);
+    obs.observe(doc.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    return obs;
+  }
+
+  // src/modules/soc/siem/helper/domapi.js
+  function hookDomapi(win, onTabSet) {
+    if (!win) return false;
+    try {
+      const domapi = win.domapi;
+      if (!domapi || typeof domapi.Pagecontrol !== "function") return false;
+      if (!domapi.__mx_hooked) {
+        domapi.__mx_hooked = true;
+        domapi.__mx_orig_Pagecontrol = domapi.Pagecontrol;
+        domapi.Pagecontrol = function(...args) {
+          const pc = domapi.__mx_orig_Pagecontrol.apply(this, args);
+          try {
+            if (pc && typeof pc.addPage === "function" && typeof pc.assignElement === "function" && typeof pc.setIndex === "function") {
+              onTabSet(pc);
+            }
+          } catch {
+          }
+          return pc;
+        };
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/modules/soc/siem/log_prettier/index.js
+  var TAG = "[log-prettier]";
+  var log = (...a) => console.log(TAG, ...a);
+  var state = {
+    tabSet: null,
+    tabInjected: false
+  };
+  function injectStyle(doc) {
+    if (!doc || !doc.head) return;
+    if (doc.getElementById("mx-log-prettier-style")) return;
+    const style = doc.createElement("style");
+    style.id = "mx-log-prettier-style";
+    style.textContent = `
+		.mx-pretty-wrapper { margin-top: 8px; }
+		.mx-pretty-block {
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 13px;
+			line-height: 1.6;
+			padding: 10px;
+			background: #f8fafc;
+			border-radius: 6px;
+			overflow: auto;
+		}
+		.mx-row { display: flex; gap: 12px; padding: 2px 0; }
+		.mx-key {
+			min-width: 220px;
+			color: #475569;
+			font-weight: 600;
+			white-space: nowrap;
+		}
+		.mx-val { color: #0f172a; word-break: break-all; }
+		.mx-divider {
+			margin: 8px 0;
+			border: none;
+			border-top: 1px solid rgba(148,163,184,.4);
+		}
+		.mx-raw summary {
+			cursor: pointer;
+			color: #2563eb;
+			font-weight: 600;
+			margin-bottom: 6px;
+		}
+		.mx-ip-public {
+			color: #dc2626;
+			font-weight: 700;
+			background: rgba(220,38,38,.12);
+			border-radius: 4px;
+			padding: 0 3px;
+		}
+		.mx-ip-private {
+			color: #2563eb;
+			font-weight: 700;
+			background: rgba(37,99,235,.12);
+			border-radius: 4px;
+			padding: 0 3px;
+		}
+		.mx-ip-loopback {
+			color: #64748b;
+			font-weight: 600;
+			background: rgba(100,116,139,.12);
+			border-radius: 4px;
+			padding: 0 3px;
+		}
+		.mx-ip-invalid {
+			color: #7c3aed;
+			font-weight: 600;
+			background: rgba(124,58,237,.1);
+			border-radius: 4px;
+			padding: 0 3px;
+		}
+	`;
+    doc.head.appendChild(style);
+  }
+  var IP_REGEX = /\b(\d{1,3}\.){3}\d{1,3}\b/g;
+  function getIPType(ip) {
+    const p = ip.split(".").map(Number);
+    if (p.length !== 4 || p.some(Number.isNaN)) return "invalid";
+    const [a, b] = p;
+    if (a === 127) return "loopback";
+    if (a === 10) return "private";
+    if (a === 192 && b === 168) return "private";
+    if (a === 172 && b >= 16 && b <= 31) return "private";
+    return "public";
+  }
+  function highlightIP(text) {
+    return text.replace(IP_REGEX, (ip) => {
+      const type = getIPType(ip);
+      return `<span class="mx-ip-${type}">${ip}</span>`;
+    });
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+  function parseKeyValue(raw) {
+    const fields = [];
+    const regex = /([A-Za-z0-9_.-]+)=([^\t\n\r]+)/g;
+    let m;
+    while (m = regex.exec(raw)) {
+      fields.push({ key: m[1], value: (m[2] || "").trim() });
+    }
+    return fields;
+  }
+  function renderPretty(rawText) {
+    const safeRaw = escapeHtml(rawText);
+    const fields = parseKeyValue(rawText);
+    if (!fields.length) {
+      return `<pre>${highlightIP(safeRaw)}</pre>`;
+    }
+    const rows = fields.map(
+      (f) => `
+			<div class="mx-row">
+				<span class="mx-key">${escapeHtml(f.key)}</span>
+				<span class="mx-val">${highlightIP(escapeHtml(f.value))}</span>
+			</div>
+		`
+    ).join("");
+    return `
+		<div class="mx-pretty-block">
+			${rows}
+			<hr class="mx-divider"/>
+			<details class="mx-raw">
+				<summary>Raw message</summary>
+				<pre>${highlightIP(safeRaw)}</pre>
+			</details>
+		</div>
+	`;
+  }
+  function ensureMaxxTab(tabSet, containerId) {
+    try {
+      if (!state.tabInjected) {
+        try {
+          tabSet.addPage({ text: "maxx", type: "DIV", index: 0 });
+        } catch {
+        }
+        state.tabInjected = true;
+      }
+      tabSet.assignElement({ id: containerId, index: 0 });
+      tabSet.setIndex(0);
+    } catch (e) {
+      console.warn("[log-prettier] tab error", e);
+    }
+  }
+  function logPrettier(ctx) {
+    if (!config_default4.enabled) return;
+    if (config_default4.iframe === false && ctx?.isIframe) return;
+    waitForIframe(config_default4.selector.frameTarget, (iframe) => {
+      log("iframe found:", iframe.id || iframe.name);
+      waitForIframeDocument(iframe, (doc) => {
+        log("iframe document ready");
+        const win = iframe.contentWindow;
+        hookDomapi(win, (tabSet) => {
+          state.tabSet = tabSet;
+          log("tabSet captured");
+          const el = doc.querySelector(".mx-pretty-wrapper");
+          if (el) ensureMaxxTab(tabSet, el.id);
+        });
+        watchElement(doc, `${config_default4.selector.rawlogContainer} ${config_default4.selector.rawlogPre}`, (rawPre, rawText) => {
+          injectStyle(doc);
+          const widget = rawPre.closest(config_default4.selector.rawlogContainer);
+          if (!widget) return;
+          let box = widget.querySelector(".mx-pretty-wrapper");
+          if (!box) {
+            box = doc.createElement("div");
+            box.className = "mx-pretty-wrapper";
+            box.id = "mx_pretty_container";
+            widget.appendChild(box);
+          }
+          box.innerHTML = renderPretty(rawText);
+          if (state.tabSet) {
+            ensureMaxxTab(state.tabSet, box.id);
+          }
+        });
+      });
+    });
+  }
+
   // src/registry.js
   var registry_default = [
     {
@@ -475,6 +755,10 @@
     {
       run: offenseWhitelistHighlighter,
       config: config_default3
+    },
+    {
+      run: logPrettier,
+      config: config_default4
     }
   ];
 
