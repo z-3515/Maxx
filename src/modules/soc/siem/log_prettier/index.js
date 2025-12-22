@@ -1,16 +1,6 @@
-// =======================================================
-// Maxx – Log Prettier (QRadar / SIEM)
-// FINAL CLEAN VERSION
-// =======================================================
+// src/modules/soc/siem/log_prettier/index.js
 
-const MAXX_TAB_ID = "MX_LOG_PRETTIER_PAGE";
-
-/* =========================
-   UTIL
-========================= */
-function escapeHtml(s) {
-	return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+const MAXX_ID = "MX_LOG_PRETTIER_PAGE";
 
 /* =========================
    STYLE
@@ -21,36 +11,43 @@ function injectStyle(doc) {
 	const style = doc.createElement("style");
 	style.id = "mx-log-prettier-style";
 	style.textContent = `
-    .mx-pretty-wrap {
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      padding: 6px;
-      box-sizing: border-box;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 13px;
-      line-height: 1.6;
-    }
+		#${MAXX_ID} {
+			width: 100%;
+			height: 100%;
+			overflow: auto;
+			box-sizing: border-box;
+			padding: 6px;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 13px;
+			line-height: 1.6;
+		}
 
-    .mx-row {
-      display: flex;
-      gap: 12px;
-      padding: 2px 0;
-    }
+		.mx-row {
+			display: flex;
+			gap: 12px;
+			padding: 2px 0;
+		}
 
-    .mx-key {
-      min-width: 220px;
-      font-weight: 600;
-      white-space: nowrap;
-      color: #334155;
-    }
+		.mx-key {
+			min-width: 220px;
+			font-weight: 600;
+			white-space: nowrap;
+			color: #334155;
+		}
 
-    .mx-divider {
-      margin: 8px 0;
-      border-top: 1px solid #cbd5e1;
-    }
-  `;
+		.mx-divider {
+			margin: 8px 0;
+			border-top: 1px solid #cbd5e1;
+		}
+	`;
 	doc.head.appendChild(style);
+}
+
+/* =========================
+   UTIL
+========================= */
+function escapeHtml(s) {
+	return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /* =========================
@@ -58,8 +55,9 @@ function injectStyle(doc) {
 ========================= */
 function parseKeyValue(raw) {
 	const out = [];
-	const re = /([A-Za-z0-9_.-]+)=([^\t\r\n]+)/g;
+	const re = /([A-Za-z0-9_.-]+)=([^\t\n\r]+)/g;
 	let m;
+
 	while ((m = re.exec(raw))) {
 		out.push({ k: m[1], v: m[2] });
 	}
@@ -74,30 +72,30 @@ function renderPretty(raw) {
 	}
 
 	return `
-    ${fields
-		.map(
-			(f) => `
-        <div class="mx-row">
-          <span class="mx-key">${f.k}</span>
-          <span>${escapeHtml(f.v)}</span>
-        </div>`
-		)
-		.join("")}
-    <hr class="mx-divider"/>
-    <details>
-      <summary>Raw</summary>
-      <pre>${escapeHtml(raw)}</pre>
-    </details>
-  `;
+		${fields
+			.map(
+				(f) => `
+				<div class="mx-row">
+					<span class="mx-key">${f.k}</span>
+					<span>${escapeHtml(f.v)}</span>
+				</div>`
+			)
+			.join("")}
+		<hr class="mx-divider"/>
+		<details>
+			<summary>Raw</summary>
+			<pre>${escapeHtml(raw)}</pre>
+		</details>
+	`;
 }
 
 /* =========================
-   PAGECONTROL HELPERS
+   PAGECONTROL
 ========================= */
 function waitForPagecontrol(win, cb, timeout = 5000) {
 	const start = Date.now();
 	const timer = setInterval(() => {
-		let pc;
+		let pc = null;
 		try {
 			pc = Object.values(win).find(
 				(v) => v && typeof v.addPage === "function" && typeof v.assignElement === "function" && typeof v.setIndex === "function" && v._tabset
@@ -107,6 +105,7 @@ function waitForPagecontrol(win, cb, timeout = 5000) {
 		if (pc) {
 			clearInterval(timer);
 			cb(pc);
+			return;
 		}
 
 		if (Date.now() - start > timeout) {
@@ -119,71 +118,81 @@ function waitForPagecontrol(win, cb, timeout = 5000) {
    STATE
 ========================= */
 const state = {
-	index: -1,
-	container: null,
+	maxxIndex: -1,
 	lastHTML: "",
-	hooked: false,
 };
 
 /* =========================
    TAB INIT
 ========================= */
+function hideMaxxNotebookPage(el) {
+	const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
+	if (page) page.style.display = "none";
+}
+
 function ensureMaxxTab(pc, doc) {
-	if (state.index !== -1) return;
+	if (state.maxxIndex !== -1) return;
 
 	pc.addPage({ text: "maxx", type: "DIV" });
-	state.index = pc.pages.length - 1;
+	state.maxxIndex = pc.pages.length - 1;
 
-	let container = doc.getElementById(MAXX_TAB_ID);
-	if (!container) {
-		container = doc.createElement("div");
-		container.id = MAXX_TAB_ID;
-		container.className = "mx-pretty-wrap";
-		doc.body.appendChild(container);
+	let el = doc.getElementById(MAXX_ID);
+	if (!el) {
+		el = doc.createElement("div");
+		el.id = MAXX_ID;
+		el.textContent = "⏳ waiting log...";
+		doc.body.appendChild(el);
 	}
 
 	pc.assignElement({
-		id: MAXX_TAB_ID,
-		index: state.index,
+		id: MAXX_ID,
+		index: state.maxxIndex,
 	});
 
-	state.container = container;
+	// 🔴 quan trọng: KHÔNG cho maxx chiếm chỗ mặc định
+	hideMaxxNotebookPage(el);
 }
 
 /* =========================
-   SYNC TAB STATE (CRITICAL)
+   NOTEBOOKPAGE VISIBILITY
 ========================= */
-function hookSetIndex(pc) {
-	if (state.hooked) return;
-	state.hooked = true;
+function isElementVisible(el) {
+	if (!el) return false;
+	const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
+	if (!page) return false;
+	if (page.style.display === "none") return false;
+	return page.offsetWidth > 0 && page.offsetHeight > 0;
+}
 
-	const orig = pc.setIndex;
-	pc.setIndex = function (i) {
-		const ret = orig.apply(this, arguments);
+function hideOtherNotebookPages(doc, el) {
+	const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
+	const myPage = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
 
-		if (i === state.index && state.container) {
-			state.container.innerHTML = state.lastHTML || "";
-		}
+	pages.forEach((p) => {
+		p.style.display = p === myPage ? "" : "none";
+	});
+}
 
-		return ret;
-	};
+function restoreNotebookPages(doc) {
+	const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
+	pages.forEach((p) => (p.style.display = ""));
 }
 
 /* =========================
    WATCH RAW LOG
 ========================= */
-function watchRawLog(doc, cb) {
-	let last = null;
+function watchElement(doc, selector, onChange) {
+	let lastText = null;
 
 	const scan = () => {
-		const pre = doc.querySelector("div.binaryWidget pre.utf");
-		if (!pre) return;
+		const el = doc.querySelector(selector);
+		if (!el) return;
 
-		const text = pre.textContent || "";
-		if (text === last) return;
+		const text = el.textContent || "";
+		if (text === lastText) return;
 
-		last = text;
-		cb(text);
+		lastText = text;
+		onChange(el, text);
 	};
 
 	scan();
@@ -217,9 +226,10 @@ function waitForIframe(targets, cb) {
 
 	if (scan()) return;
 
-	new MutationObserver(() => {
-		if (scan()) this.disconnect?.();
-	}).observe(document.documentElement, { childList: true, subtree: true });
+	const obs = new MutationObserver(() => {
+		if (scan()) obs.disconnect();
+	});
+	obs.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 function waitForIframeDocument(iframe, cb) {
@@ -246,18 +256,26 @@ function logPrettier() {
 		waitForIframeDocument(iframe, (doc) => {
 			injectStyle(doc);
 
-			watchRawLog(doc, (raw) => {
-				const html = renderPretty(raw);
+			watchElement(doc, "div.binaryWidget pre.utf", (_, rawText) => {
+				const html = renderPretty(rawText);
 				state.lastHTML = html;
 
 				const win = doc.defaultView || window;
 				waitForPagecontrol(win, (pc) => {
 					ensureMaxxTab(pc, doc);
-					hookSetIndex(pc);
 
-					// chỉ render nếu tab đang active
-					if (pc.tabIndex === state.index && state.container) {
-						state.container.innerHTML = html;
+					const el = doc.getElementById(MAXX_ID);
+					if (!el) return;
+
+					// luôn render (giống bản stable)
+					el.innerHTML = html;
+
+					// chỉ khi user đang ở tab maxx thì mới chiếm layout
+					if (isElementVisible(el)) {
+						hideOtherNotebookPages(doc, el);
+					} else {
+						restoreNotebookPages(doc);
+						hideMaxxNotebookPage(el);
 					}
 				});
 			});
