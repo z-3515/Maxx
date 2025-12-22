@@ -19,7 +19,7 @@ export default {
 	selector: {
 		iframeId: ["PAGE_EVENTVIEWER", "mainPage"],
 		toolbarClass: ["shade"],
-		eventViewerLogContainerClass: [".utf.text"],
+		eventViewerLogContainerClass: [".utf.text-wrap"],
 		eventTableCells: ["#tableSection .grid.dashboard-grid tbody tr td"],
 	},
 };

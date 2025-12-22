@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.43
+// @version      3.44
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -708,7 +708,7 @@
     selector: {
       iframeId: ["PAGE_EVENTVIEWER", "mainPage"],
       toolbarClass: ["shade"],
-      eventViewerLogContainerClass: [".utf.text"],
+      eventViewerLogContainerClass: [".utf.text-wrap"],
       eventTableCells: ["#tableSection .grid.dashboard-grid tbody tr td"]
     }
   };
