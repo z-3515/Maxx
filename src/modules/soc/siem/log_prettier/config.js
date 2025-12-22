@@ -2,7 +2,7 @@ export default {
 	name: "log-prettier module",
 	// module-id: bG9nLXByZXR0aWVyIG1vZHVsZQ==
 
-	enabled: true,
+	enabled: false,
 	match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
 	exclude: [],
 	runAt: "document-end",

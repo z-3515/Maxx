@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Maxx Custom Script
 // @namespace    maxx
-// @version      3.40
+// @version      3.43
 // @description  Maxx Script
 // @author       Maxx
 // @run-at       document-end
@@ -13,6 +13,7 @@
 // ==/UserScript==
 
 // module: selected-search module | c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
+// module: hex-decoder module | aGV4LWRlY29kZXIgbW9kdWxl
 // module: log-prettier module | bG9nLXByZXR0aWVyIG1vZHVsZQ==
 // module: offense-whitelist-highlighter module | b2ZmZW5zZS13aGl0ZWxpc3QtaGlnaGxpZ2h0ZXIgbW9kdWxl
 // module: test-module | dGVzdC1tb2R1bGU=
@@ -679,7 +680,7 @@
   var config_default4 = {
     name: "log-prettier module",
     // module-id: bG9nLXByZXR0aWVyIG1vZHVsZQ==
-    enabled: true,
+    enabled: false,
     match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
     exclude: [],
     runAt: "document-end",
@@ -692,6 +693,140 @@
       rawlogPre: "pre.utf"
     }
   };
+
+  // src/modules/soc/siem/hex_decoder/config.js
+  var config_default5 = {
+    name: "hex-decoder module",
+    // module-id: aGV4LWRlY29kZXIgbW9kdWxl
+    enabled: true,
+    match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
+    exclude: [],
+    runAt: "document-end",
+    iframe: true,
+    once: true,
+    priority: 10,
+    selector: {
+      iframeId: ["PAGE_EVENTVIEWER", "mainPage"],
+      toolbarClass: ["shade"],
+      eventViewerLogContainerClass: [".utf.text"],
+      eventTableCells: ["#tableSection .grid.dashboard-grid tbody tr td"]
+    }
+  };
+
+  // src/modules/soc/siem/hex_decoder/index.js
+  function runHexDecoderModule(ctx) {
+    const sel = config_default5.selector;
+    function isAllowedIframe() {
+      if (!sel.iframeId || !sel.iframeId.length) return false;
+      const frame = window.frameElement;
+      if (!frame || !frame.id) return false;
+      return sel.iframeId.includes(frame.id);
+    }
+    if (!isAllowedIframe()) {
+      return;
+    }
+    let enabled = false;
+    const ORIGINAL_TEXT = /* @__PURE__ */ new Map();
+    function isHexString(str) {
+      if (!str) return false;
+      const s = str.trim();
+      return s.length >= 8 && s.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(s);
+    }
+    function hexToUtf8(hex) {
+      try {
+        const bytes = hex.match(/.{1,2}/g).map((b) => parseInt(b, 16));
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        return decoder.decode(new Uint8Array(bytes));
+      } catch {
+        return null;
+      }
+    }
+    function decodeTextNode(el) {
+      const raw = el.textContent;
+      if (!raw) return false;
+      const hexChunks = raw.match(/[0-9a-fA-F]{8,}/g);
+      if (!hexChunks) return false;
+      let replaced = raw;
+      let changed = false;
+      hexChunks.forEach((hex) => {
+        if (hex.length % 2 !== 0) return;
+        const decoded = hexToUtf8(hex);
+        if (!decoded || decoded.includes("�")) return;
+        replaced = replaced.replace(hex, decoded);
+        changed = true;
+      });
+      if (!changed) return false;
+      ORIGINAL_TEXT.set(el, raw);
+      el.textContent = replaced;
+      el.style.color = "red";
+      el.style.fontWeight = "400";
+      return true;
+    }
+    function restoreTextNode(el) {
+      if (!ORIGINAL_TEXT.has(el)) return;
+      el.textContent = ORIGINAL_TEXT.get(el);
+      el.style.color = "";
+      el.style.fontWeight = "";
+    }
+    function getTargets() {
+      const targets = [];
+      sel.eventViewerLogContainerClass?.forEach((s) => {
+        document.querySelectorAll(s).forEach((el) => targets.push(el));
+      });
+      sel.eventTableCells?.forEach((s) => {
+        document.querySelectorAll(s).forEach((td) => {
+          td.querySelectorAll("span").forEach((sp) => targets.push(sp));
+        });
+      });
+      return targets;
+    }
+    function enableDecode() {
+      getTargets().forEach((el) => {
+        if (!ORIGINAL_TEXT.has(el)) {
+          decodeTextNode(el);
+        }
+      });
+    }
+    function disableDecode() {
+      ORIGINAL_TEXT.forEach((original, el) => {
+        el.textContent = original;
+        el.style.color = "";
+        el.style.fontWeight = "";
+      });
+      ORIGINAL_TEXT.clear();
+    }
+    function toggle() {
+      enabled = !enabled;
+      enabled ? enableDecode() : disableDecode();
+      updateButton();
+    }
+    let btn;
+    function updateButton() {
+      if (!btn) return;
+      btn.style.background = enabled ? "#8b0000" : "";
+      btn.style.color = enabled ? "#fff" : "";
+    }
+    function injectButton() {
+      const toolbar = document.querySelector(sel.toolbarClass.map((c) => `.${c}`).join(","));
+      if (!toolbar) return;
+      btn = document.createElement("div");
+      btn.textContent = "Hex Decode";
+      btn.style.cssText = `
+			display: inline-flex;
+			align-items: center;
+			padding: 2px 8px;
+			margin-left: 6px;
+			border: 1px solid #888;
+			border-radius: 3px;
+			cursor: pointer;
+			font-size: 12px;
+			user-select: none;
+		`;
+      btn.addEventListener("click", toggle);
+      toolbar.appendChild(btn);
+    }
+    injectButton();
+  }
 
   // src/registry.js
   var registry_default = [
@@ -710,6 +845,10 @@
     {
       run: log_prettier_default,
       config: config_default4
+    },
+    {
+      run: runHexDecoderModule,
+      config: config_default5
     }
   ];
 

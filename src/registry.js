@@ -10,6 +10,9 @@ import offenseWhitelistHighlighterConfig from "./modules/soc/siem/offense_whitel
 import logPrettier from "./modules/soc/siem/log_prettier/index.js";
 import logPrettierConfig from "./modules/soc/siem/log_prettier/config.js";
 
+import runHexDecoderModule from "./modules/soc/siem/hex_decoder/index.js";
+import hexDecoderConfig from "./modules/soc/siem/hex_decoder/config.js";
+
 export default [
 	{
 		run: test,
@@ -26,5 +29,9 @@ export default [
 	{
 		run: logPrettier,
 		config: logPrettierConfig,
+	},
+	{
+		run: runHexDecoderModule,
+		config: hexDecoderConfig,
 	},
 ];
