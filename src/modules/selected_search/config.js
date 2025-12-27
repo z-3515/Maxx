@@ -21,7 +21,7 @@ export default {
 
 			url: (q) => `https://www.virustotal.com/gui/search/${q}`,
 
-			match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
+			match: ["*://*.vnpt.vn/*"],
 
 			condition: (text, { isHash, isIP, isDomain }) => {
 				return isHash(text) || isIP(text) || isDomain(text);

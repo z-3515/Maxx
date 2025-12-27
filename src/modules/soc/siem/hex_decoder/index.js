@@ -72,7 +72,7 @@ export default function runHexDecoderModule(ctx) {
 
 		ORIGINAL_TEXT.set(el, raw);
 		el.textContent = replaced;
-		el.style.color = "red";
+		el.style.color = "yellow";
 		el.style.fontWeight = "400";
 
 		return true;
