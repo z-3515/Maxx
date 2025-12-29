@@ -27,7 +27,10 @@ export default {
 		rows: "#tableSection table#defaultTable tbody tr",
 	},
 	mss: {
-		whitelist: ["REC: Alert from IDPS of BO_KHCN containing", "Cang_HPG"],
+		whitelist: [
+			"REC: Alert from IDPS of BO_KHCN containing",
+			"Cang_HPG"
+		],
 	},
 	siem: {
 		whitelist: [
@@ -53,6 +56,7 @@ export default {
 			"HTTP 403 - Forbidden",
 			"HTTP 404 - Not Found",
 			"HTTP 302 - Object Moved",
+			"HTTP 304 - Not Modified",
 			"POST",
 			"GET",
 			"HEAD",
