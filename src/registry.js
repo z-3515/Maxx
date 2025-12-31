@@ -14,24 +14,24 @@ import runHexDecoderModule from "./modules/soc/siem/hex_decoder/index.js";
 import hexDecoderConfig from "./modules/soc/siem/hex_decoder/config.js";
 
 export default [
-	{
-		run: test,
-		config: testConfig,
-	},
-	{
-		run: selectedSearch,
-		config: selectedSearchConfig,
-	},
-	{
-		run: offenseWhitelistHighlighter,
-		config: offenseWhitelistHighlighterConfig,
-	},
-	{
-		run: logPrettier,
-		config: logPrettierConfig,
-	},
-	{
-		run: runHexDecoderModule,
-		config: hexDecoderConfig,
-	},
+    {
+        run: test,
+        config: testConfig,
+    },
+    {
+        run: selectedSearch,
+        config: selectedSearchConfig,
+    },
+    {
+        run: offenseWhitelistHighlighter,
+        config: offenseWhitelistHighlighterConfig,
+    },
+    {
+        run: logPrettier,
+        config: logPrettierConfig,
+    },
+    {
+        run: runHexDecoderModule,
+        config: hexDecoderConfig,
+    },
 ];

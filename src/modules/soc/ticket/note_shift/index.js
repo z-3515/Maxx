@@ -2,8 +2,9 @@ import { default as config } from "./config.js";
 import { zammadFetch } from "../helper/zammad_api.js";
 import { observeWhenVisible } from "../helper/domObserver.js";
 
-async function fetchAllTickets(config) {
-    return await zammadFetch(config.api.all_ticket);
+async function fetchAllTickets(target) {
+    const api = config.api.all_ticket;
+    return zammadFetch(api);
 }
 
 function injectNoteShiftStyle() {
@@ -335,27 +336,6 @@ function toLocalDateTimeInput(date) {
     );
 }
 
-function extractPureNote(noteText) {
-    if (!noteText) return "";
-
-    return noteText
-        .split("\n")
-        .filter((line) => {
-            const l = line.trim();
-            if (!l) return false;
-            if (l.startsWith("===")) return false;
-            if (l.startsWith("Tổng ticket")) return false;
-            if (l.startsWith("Thống kê")) return false;
-            if (l.startsWith("- ")) return false;
-            if (l.startsWith("Lần chạy")) return false;
-            if (l.startsWith("------")) return false;
-            if (l.startsWith("Danh sách Re-check")) return false;
-            return true;
-        })
-        .join("\n")
-        .trim();
-}
-
 function renderNoteShiftTimePicker(screenEl) {
     screenEl.innerHTML = "";
 
@@ -427,8 +407,7 @@ function renderNoteShiftTimePicker(screenEl) {
 
         const target = detectTargetByURL();
         if (!target) {
-            editorEl.textContent =
-                "❌ Không xác định được hệ thống (MSS / SIEM)";
+            alert("❌ Không xác định được hệ thống");
             return;
         }
 
@@ -439,67 +418,48 @@ function renderNoteShiftTimePicker(screenEl) {
 
         const editorEl = container.querySelector(".maxx-note-editor");
         const copyBtn = container.querySelector(".maxx-copy-btn");
-        let currentPureNote = "";
 
-        // loading
-        editorEl.textContent = "⏳ Đang xử lý dữ liệu...";
+        editorEl.textContent = "⏳ Đang crawl dữ liệu...";
+        copyBtn.onclick = null; // reset handler cũ
 
         try {
-            const { noteText } = await processData({
+            const { noteHTML, copyText } = await processData({
                 target,
                 startTime: start,
                 endTime: end,
                 shiftLabel,
             });
 
-            // ✅ HIỂN THỊ HTML CÓ LINK
-            editorEl.innerHTML = noteText;
-            currentPureNote = extractPureNote(editorEl.innerText);
-        } catch (err) {
-            editorEl.textContent = "❌ Lỗi xử lý dữ liệu: " + err.message;
-        }
+            // render UI (có link)
+            editorEl.innerHTML = noteHTML;
 
-        // ✅ COPY → TEXT SẠCH (strip <a>)
-        copyBtn.onclick = async () => {
-            const text = (currentPureNote || "").trim();
-            if (!text) {
-                alert("Chưa có nội dung note để copy");
-                return;
-            }
+            // ✅ COPY CHỈ SUMMARY
+            copyBtn.onclick = async () => {
+                if (!copyText) {
+                    alert("Không có nội dung để copy");
+                    return;
+                }
 
-            try {
-                await navigator.clipboard.writeText(text);
+                await navigator.clipboard.writeText(copyText);
                 copyBtn.innerText = "Đã copy";
                 setTimeout(() => (copyBtn.innerText = "Copy Note"), 1500);
-            } catch {
-                alert("Không copy được, hãy copy thủ công");
-            }
-        };
+            };
 
-        editorEl.addEventListener("copy", (e) => {
-            e.preventDefault();
-            const sel = window.getSelection();
-            const text = sel ? sel.toString() : "";
-            e.clipboardData.setData("text/plain", text);
-        });
+            // copy thủ công khi bôi đen
+            editorEl.addEventListener("copy", (e) => {
+                const sel = window.getSelection();
+                if (!sel || sel.isCollapsed) return;
 
-        editorEl.addEventListener("click", (e) => {
-            const a = e.target?.closest?.("a");
-            if (!a) return;
-
-            // đảm bảo click là mở tab, không bị SPA / editor chặn
-            e.preventDefault();
-            e.stopPropagation();
-
-            const href = a.getAttribute("href");
-            if (href) window.open(href, "_blank", "noopener,noreferrer");
-        });
+                e.preventDefault();
+                e.clipboardData.setData("text/plain", sel.toString());
+            });
+        } catch (err) {
+            editorEl.textContent =
+                err.message === "SESSION_INVALID_OR_NOT_LOGIN"
+                    ? "❌ Bạn chưa đăng nhập hệ thống này"
+                    : "❌ Lỗi xử lý dữ liệu";
+        }
     };
-}
-
-function parseLocalDateTime(value) {
-    // value: "2025-12-29T06:00"
-    return new Date(value).getTime();
 }
 
 function filterCategory(target, ticket) {
@@ -599,21 +559,33 @@ function buildTicketLink(target, ticket) {
 async function processData({ target, startTime, endTime, shiftLabel }) {
     const { STATE_LABEL, SPECIAL_ORG } = config.mapping;
 
-    const data = await fetchAllTickets(config);
+    const data = await fetchAllTickets(target);
 
-    const ticketsAll = Object.values(data?.assets?.Ticket || {});
-    const stateMap = data?.assets?.TicketState || {};
+    if (!data || !data.assets || !data.assets.Ticket) {
+        throw new Error("SESSION_INVALID_OR_NOT_LOGIN");
+    }
+
+    const ticketsAll = Object.values(data.assets.Ticket || {});
+    const stateMap = data.assets.TicketState || {};
+
+    if (!ticketsAll.length) {
+        throw new Error("NO_TICKET_DATA");
+    }
 
     const start = new Date(startTime);
     const end = new Date(endTime);
 
-    // ===== Lọc theo thời gian =====
+    /* ============================
+       1️⃣ Filter tickets by time
+    ============================ */
     const tickets = ticketsAll.filter((t) => {
         const time = new Date(t.created_at || t.updated_at);
         return time >= start && time <= end;
     });
 
-    // ===== Thống kê trạng thái =====
+    /* ============================
+       2️⃣ State statistics
+    ============================ */
     const stateCount = {};
     tickets.forEach((t) => {
         const stateName = stateMap[t.state_id]?.name || `#${t.state_id}`;
@@ -621,9 +593,18 @@ async function processData({ target, startTime, endTime, shiftLabel }) {
         stateCount[label] = (stateCount[label] || 0) + 1;
     });
 
-    let output = "";
-    let recheck = [];
+    /* ============================
+       3️⃣ Build data buckets
+    ============================ */
+    let summaryHTML = "";
+    let summaryText = "";
+    let recheckHTML = "";
 
+    const recheckTickets = [];
+
+    /* ============================
+       4️⃣ MSS logic
+    ============================ */
     if (target === "mss") {
         const MSS_list = [];
         const org_lists = {};
@@ -632,7 +613,7 @@ async function processData({ target, startTime, endTime, shiftLabel }) {
             if (![1, 2].includes(t.state_id)) return;
 
             const cat = filterCategory(target, t);
-            if (cat === "re-check") recheck.push(t);
+            if (cat === "re-check") recheckTickets.push(t);
 
             if (SPECIAL_ORG[t.organization_id]) {
                 const org = SPECIAL_ORG[t.organization_id];
@@ -643,39 +624,71 @@ async function processData({ target, startTime, endTime, shiftLabel }) {
             }
         });
 
-        const mssStr = groupTicketsString(target, MSS_list);
-        if (mssStr) output += `MSS: ${mssStr} chưa xử lý.\n`;
+        // MSS
+        const mssHTML = groupTicketsString(target, MSS_list);
+        const mssText = mssHTML.replace(/<[^>]+>/g, "");
 
+        if (mssHTML) {
+            summaryHTML += `MSS: ${mssHTML} chưa xử lý.\n`;
+            summaryText += `MSS: ${mssText} chưa xử lý.\n`;
+        }
+
+        // ORG (VNPOST, ABBank, ...)
         Object.entries(org_lists).forEach(([org, list]) => {
-            const str = groupTicketsString(target, list);
-            if (str) output += `${org}: ${str} chưa xử lý.\n`;
+            const html = groupTicketsString(target, list);
+            const text = html.replace(/<[^>]+>/g, "");
+
+            if (html) {
+                summaryHTML += `${org}: ${html} chưa xử lý.\n`;
+                summaryText += `${org}: ${text} chưa xử lý.\n`;
+            }
         });
-    } else {
+    }
+
+    /* ============================
+       5️⃣ SIEM logic
+    ============================ */
+    if (target === "siem") {
         const list = [];
+
         tickets.forEach((t) => {
             if (![1, 2].includes(t.state_id)) return;
+
             const cat = filterCategory(target, t);
-            if (cat === "re-check") recheck.push(t);
+            if (cat === "re-check") recheckTickets.push(t);
             list.push(t);
         });
 
-        const siemStr = groupTicketsString(target, list);
-        if (siemStr) output += `SIEM: ${siemStr} chưa xử lý.\n`;
+        const siemHTML = groupTicketsString(target, list);
+        const siemText = siemHTML.replace(/<[^>]+>/g, "");
+
+        if (siemHTML) {
+            summaryHTML += `SIEM: ${siemHTML} chưa xử lý.\n`;
+            summaryText += `SIEM: ${siemText} chưa xử lý.\n`;
+        }
     }
 
-    if (recheck.length) {
-        output += `\n------\nDanh sách Re-check:\n`;
-        recheck.forEach((t) => {
-            output += `- ${buildTicketLink(target, t)}: ${cleanTitle(
+    /* ============================
+       6️⃣ Re-check (HTML only)
+    ============================ */
+    if (recheckTickets.length) {
+        recheckHTML += `\n------\nDanh sách Re-check:\n`;
+        recheckTickets.forEach((t) => {
+            recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(
                 t.title
             )}\n`;
         });
     }
 
-    // ===== Build note =====
+    /* ============================
+       7️⃣ Build final NOTE (HTML)
+    ============================ */
     const block = [];
     block.push(`=== NOTE ${target.toUpperCase()} (${shiftLabel}) ===`);
-    block.push(output.trim());
+    block.push(summaryHTML.trim());
+
+    if (recheckHTML) block.push(recheckHTML.trim());
+
     block.push(`\nTổng ticket lọc: ${tickets.length}`);
     block.push(`Thống kê trạng thái:`);
 
@@ -683,10 +696,12 @@ async function processData({ target, startTime, endTime, shiftLabel }) {
 
     block.push(`Lần chạy: ${new Date().toLocaleString("vi-VN")}`);
 
+    /* ============================
+       8️⃣ RETURN (CRITICAL)
+    ============================ */
     return {
-        noteText: block.join("\n"),
-        tickets,
-        stateCount,
+        noteHTML: block.join("\n"),
+        copyText: summaryText.trim(), // ✅ CHỈ SUMMARY – KHÔNG HTML – KHÔNG RECHECK
     };
 }
 

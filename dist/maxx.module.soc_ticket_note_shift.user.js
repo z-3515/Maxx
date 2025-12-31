@@ -168,8 +168,9 @@ ${text}`
   __name(observeWhenVisible, "observeWhenVisible");
 
   // src/modules/soc/ticket/note_shift/index.js
-  async function fetchAllTickets(config) {
-    return await zammadFetch(config.api.all_ticket);
+  async function fetchAllTickets(target) {
+    const api = config_default.api.all_ticket;
+    return zammadFetch(api);
   }
   __name(fetchAllTickets, "fetchAllTickets");
   function injectNoteShiftStyle() {
@@ -462,22 +463,6 @@ ${text}`
     return local.getFullYear() + "-" + pad(local.getMonth() + 1) + "-" + pad(local.getDate()) + "T" + pad(local.getHours()) + ":" + pad(local.getMinutes());
   }
   __name(toLocalDateTimeInput, "toLocalDateTimeInput");
-  function extractPureNote(noteText) {
-    if (!noteText) return "";
-    return noteText.split("\n").filter((line) => {
-      const l = line.trim();
-      if (!l) return false;
-      if (l.startsWith("===")) return false;
-      if (l.startsWith("Tổng ticket")) return false;
-      if (l.startsWith("Thống kê")) return false;
-      if (l.startsWith("- ")) return false;
-      if (l.startsWith("Lần chạy")) return false;
-      if (l.startsWith("------")) return false;
-      if (l.startsWith("Danh sách Re-check")) return false;
-      return true;
-    }).join("\n").trim();
-  }
-  __name(extractPureNote, "extractPureNote");
   function renderNoteShiftTimePicker(screenEl) {
     screenEl.innerHTML = "";
     const container = document.createElement("div");
@@ -535,61 +520,43 @@ ${text}`
       }
       const target = detectTargetByURL();
       if (!target) {
-        editorEl.textContent = "❌ Không xác định được hệ thống (MSS / SIEM)";
+        alert("❌ Không xác định được hệ thống");
         return;
       }
       const shiftLabel = container.querySelector("[data-shift].active")?.innerText?.split("\n")[0] || "Ca";
       const editorEl = container.querySelector(".maxx-note-editor");
       const copyBtn = container.querySelector(".maxx-copy-btn");
-      let currentPureNote = "";
-      editorEl.textContent = "⏳ Đang xử lý dữ liệu...";
+      editorEl.textContent = "⏳ Đang crawl dữ liệu...";
+      copyBtn.onclick = null;
       try {
-        const { noteText: noteText2 } = await processData({
+        const { noteHTML, copyText } = await processData({
           target,
           startTime: start,
           endTime: end,
           shiftLabel
         });
-        editorEl.innerHTML = noteText2;
-        currentPureNote = extractPureNote(editorEl.innerText);
-      } catch (err) {
-        editorEl.textContent = "❌ Lỗi xử lý dữ liệu: " + err.message;
-      }
-      copyBtn.onclick = async () => {
-        const text = (currentPureNote || "").trim();
-        if (!text) {
-          alert("Chưa có nội dung note để copy");
-          return;
-        }
-        try {
-          await navigator.clipboard.writeText(text);
+        editorEl.innerHTML = noteHTML;
+        copyBtn.onclick = async () => {
+          if (!copyText) {
+            alert("Không có nội dung để copy");
+            return;
+          }
+          await navigator.clipboard.writeText(copyText);
           copyBtn.innerText = "Đã copy";
           setTimeout(() => copyBtn.innerText = "Copy Note", 1500);
-        } catch {
-          alert("Không copy được, hãy copy thủ công");
-        }
-      };
-      editorEl.addEventListener("copy", (e) => {
-        e.preventDefault();
-        const sel = window.getSelection();
-        const text = sel ? sel.toString() : "";
-        e.clipboardData.setData("text/plain", text);
-      });
-      editorEl.addEventListener("click", (e) => {
-        const a = e.target?.closest?.("a");
-        if (!a) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const href = a.getAttribute("href");
-        if (href) window.open(href, "_blank", "noopener,noreferrer");
-      });
+        };
+        editorEl.addEventListener("copy", (e) => {
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) return;
+          e.preventDefault();
+          e.clipboardData.setData("text/plain", sel.toString());
+        });
+      } catch (err) {
+        editorEl.textContent = err.message === "SESSION_INVALID_OR_NOT_LOGIN" ? "❌ Bạn chưa đăng nhập hệ thống này" : "❌ Lỗi xử lý dữ liệu";
+      }
     };
   }
   __name(renderNoteShiftTimePicker, "renderNoteShiftTimePicker");
-  function parseLocalDateTime(value) {
-    return new Date(value).getTime();
-  }
-  __name(parseLocalDateTime, "parseLocalDateTime");
   function filterCategory(target, ticket) {
     const title = ticket.title?.toLowerCase() || "";
     const base = /* @__PURE__ */ __name(() => {
@@ -666,9 +633,15 @@ ${text}`
   __name(buildTicketLink, "buildTicketLink");
   async function processData({ target, startTime, endTime, shiftLabel }) {
     const { STATE_LABEL, SPECIAL_ORG } = config_default.mapping;
-    const data = await fetchAllTickets(config_default);
-    const ticketsAll = Object.values(data?.assets?.Ticket || {});
-    const stateMap = data?.assets?.TicketState || {};
+    const data = await fetchAllTickets(target);
+    if (!data || !data.assets || !data.assets.Ticket) {
+      throw new Error("SESSION_INVALID_OR_NOT_LOGIN");
+    }
+    const ticketsAll = Object.values(data.assets.Ticket || {});
+    const stateMap = data.assets.TicketState || {};
+    if (!ticketsAll.length) {
+      throw new Error("NO_TICKET_DATA");
+    }
     const start = new Date(startTime);
     const end = new Date(endTime);
     const tickets = ticketsAll.filter((t) => {
@@ -681,15 +654,17 @@ ${text}`
       const label = STATE_LABEL[target]?.[stateName] || stateName;
       stateCount[label] = (stateCount[label] || 0) + 1;
     });
-    let output = "";
-    let recheck = [];
+    let summaryHTML = "";
+    let summaryText = "";
+    let recheckHTML = "";
+    const recheckTickets = [];
     if (target === "mss") {
       const MSS_list = [];
       const org_lists = {};
       tickets.forEach((t) => {
         if (![1, 2].includes(t.state_id)) return;
         const cat = filterCategory(target, t);
-        if (cat === "re-check") recheck.push(t);
+        if (cat === "re-check") recheckTickets.push(t);
         if (SPECIAL_ORG[t.organization_id]) {
           const org = SPECIAL_ORG[t.organization_id];
           if (!org_lists[org]) org_lists[org] = [];
@@ -698,33 +673,49 @@ ${text}`
           MSS_list.push(t);
         }
       });
-      const mssStr = groupTicketsString(target, MSS_list);
-      if (mssStr) output += `MSS: ${mssStr} chưa xử lý.
+      const mssHTML = groupTicketsString(target, MSS_list);
+      const mssText = mssHTML.replace(/<[^>]+>/g, "");
+      if (mssHTML) {
+        summaryHTML += `MSS: ${mssHTML} chưa xử lý.
 `;
+        summaryText += `MSS: ${mssText} chưa xử lý.
+`;
+      }
       Object.entries(org_lists).forEach(([org, list]) => {
-        const str = groupTicketsString(target, list);
-        if (str) output += `${org}: ${str} chưa xử lý.
+        const html = groupTicketsString(target, list);
+        const text = html.replace(/<[^>]+>/g, "");
+        if (html) {
+          summaryHTML += `${org}: ${html} chưa xử lý.
 `;
+          summaryText += `${org}: ${text} chưa xử lý.
+`;
+        }
       });
-    } else {
+    }
+    if (target === "siem") {
       const list = [];
       tickets.forEach((t) => {
         if (![1, 2].includes(t.state_id)) return;
         const cat = filterCategory(target, t);
-        if (cat === "re-check") recheck.push(t);
+        if (cat === "re-check") recheckTickets.push(t);
         list.push(t);
       });
-      const siemStr = groupTicketsString(target, list);
-      if (siemStr) output += `SIEM: ${siemStr} chưa xử lý.
+      const siemHTML = groupTicketsString(target, list);
+      const siemText = siemHTML.replace(/<[^>]+>/g, "");
+      if (siemHTML) {
+        summaryHTML += `SIEM: ${siemHTML} chưa xử lý.
 `;
+        summaryText += `SIEM: ${siemText} chưa xử lý.
+`;
+      }
     }
-    if (recheck.length) {
-      output += `
+    if (recheckTickets.length) {
+      recheckHTML += `
 ------
 Danh sách Re-check:
 `;
-      recheck.forEach((t) => {
-        output += `- ${buildTicketLink(target, t)}: ${cleanTitle(
+      recheckTickets.forEach((t) => {
+        recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(
           t.title
         )}
 `;
@@ -732,16 +723,17 @@ Danh sách Re-check:
     }
     const block = [];
     block.push(`=== NOTE ${target.toUpperCase()} (${shiftLabel}) ===`);
-    block.push(output.trim());
+    block.push(summaryHTML.trim());
+    if (recheckHTML) block.push(recheckHTML.trim());
     block.push(`
 Tổng ticket lọc: ${tickets.length}`);
     block.push(`Thống kê trạng thái:`);
     Object.entries(stateCount).forEach(([s, c]) => block.push(`- ${s}: ${c}`));
     block.push(`Lần chạy: ${(/* @__PURE__ */ new Date()).toLocaleString("vi-VN")}`);
     return {
-      noteText: block.join("\n"),
-      tickets,
-      stateCount
+      noteHTML: block.join("\n"),
+      copyText: summaryText.trim()
+      // ✅ CHỈ SUMMARY – KHÔNG HTML – KHÔNG RECHECK
     };
   }
   __name(processData, "processData");
