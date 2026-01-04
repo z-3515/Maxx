@@ -478,6 +478,7 @@ function filterCategory(target, ticket) {
         if (title.includes("ngừng đẩy log")) return "ngừng đẩy log";
         if (title.includes("tạo file") || title.includes("create file"))
             return "create file";
+        if (title.includes("xác minh hành vi")) return "xác minh hành vi";
         return "re-check";
     };
 

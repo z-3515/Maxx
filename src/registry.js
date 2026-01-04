@@ -13,6 +13,9 @@ import logPrettierConfig from "./modules/soc/siem/log_prettier/config.js";
 import runHexDecoderModule from "./modules/soc/siem/hex_decoder/index.js";
 import hexDecoderConfig from "./modules/soc/siem/hex_decoder/config.js";
 
+import noteShift from "./modules/soc/ticket/note_shift/index.js";
+import noteShiftConfig from "./modules/soc/ticket/note_shift/config.js";
+
 export default [
     {
         run: test,
@@ -33,5 +36,9 @@ export default [
     {
         run: runHexDecoderModule,
         config: hexDecoderConfig,
+    },
+    {
+        run: noteShift,
+        config: noteShiftConfig,
     },
 ];
