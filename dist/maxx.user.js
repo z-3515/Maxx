@@ -495,223 +495,11 @@
     }, 500);
   }
 
-  // src/modules/soc/siem/log_prettier/index.js
-  var MAXX_ID = "MX_LOG_PRETTIER_PAGE";
-  function injectStyle(doc) {
-    if (doc.getElementById("mx-log-prettier-style")) return;
-    const style = doc.createElement("style");
-    style.id = "mx-log-prettier-style";
-    style.textContent = `
-		#${MAXX_ID} {
-			width: 100%;
-			height: 100%;
-			overflow: auto;
-			box-sizing: border-box;
-			padding: 6px;
-			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-			font-size: 13px;
-			line-height: 1.6;
-		}
-
-		.mx-row {
-			display: flex;
-			gap: 12px;
-			padding: 2px 0;
-		}
-
-		.mx-key {
-			min-width: 220px;
-			font-weight: 600;
-			white-space: nowrap;
-			color: #334155;
-		}
-
-		.mx-divider {
-			margin: 8px 0;
-			border-top: 1px solid #cbd5e1;
-		}
-	`;
-    doc.head.appendChild(style);
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function parseKeyValue(raw) {
-    const out = [];
-    const re = /([A-Za-z0-9_.-]+)=([^\t\n\r]+)/g;
-    let m;
-    while (m = re.exec(raw)) {
-      out.push({ k: m[1], v: m[2] });
-    }
-    return out;
-  }
-  function renderPretty(raw) {
-    const fields = parseKeyValue(raw);
-    if (!fields.length) {
-      return `<pre>${escapeHtml(raw)}</pre>`;
-    }
-    return `
-		${fields.map(
-      (f) => `
-				<div class="mx-row">
-					<span class="mx-key">${f.k}</span>
-					<span>${escapeHtml(f.v)}</span>
-				</div>`
-    ).join("")}
-		<hr class="mx-divider"/>
-		<details>
-			<summary>Raw</summary>
-			<pre>${escapeHtml(raw)}</pre>
-		</details>
-	`;
-  }
-  function waitForPagecontrol(win, cb, timeout = 5e3) {
-    const start = Date.now();
-    const timer = setInterval(() => {
-      let pc = null;
-      try {
-        pc = Object.values(win).find(
-          (v) => v && typeof v.addPage === "function" && typeof v.assignElement === "function" && typeof v.setIndex === "function" && v._tabset
-        );
-      } catch {
-      }
-      if (pc) {
-        clearInterval(timer);
-        cb(pc);
-        return;
-      }
-      if (Date.now() - start > timeout) {
-        clearInterval(timer);
-      }
-    }, 100);
-  }
-  var state = {
-    maxxIndex: -1,
-    lastHTML: ""
-  };
-  function hideMaxxNotebookPage(el) {
-    const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
-    if (page) page.style.display = "none";
-  }
-  function ensureMaxxTab(pc, doc) {
-    if (state.maxxIndex !== -1) return;
-    pc.addPage({ text: "maxx", type: "DIV" });
-    state.maxxIndex = pc.pages.length - 1;
-    let el = doc.getElementById(MAXX_ID);
-    if (!el) {
-      el = doc.createElement("div");
-      el.id = MAXX_ID;
-      el.textContent = "⏳ waiting log...";
-      doc.body.appendChild(el);
-    }
-    pc.assignElement({
-      id: MAXX_ID,
-      index: state.maxxIndex
-    });
-    hideMaxxNotebookPage(el);
-  }
-  function isElementVisible(el) {
-    if (!el) return false;
-    const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
-    if (!page) return false;
-    if (page.style.display === "none") return false;
-    return page.offsetWidth > 0 && page.offsetHeight > 0;
-  }
-  function hideOtherNotebookPages(doc, el) {
-    const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
-    const myPage = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
-    pages.forEach((p) => {
-      p.style.display = p === myPage ? "" : "none";
-    });
-  }
-  function restoreNotebookPages(doc) {
-    const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
-    pages.forEach((p) => p.style.display = "");
-  }
-  function watchElement(doc, selector, onChange) {
-    let lastText = null;
-    const scan = () => {
-      const el = doc.querySelector(selector);
-      if (!el) return;
-      const text = el.textContent || "";
-      if (text === lastText) return;
-      lastText = text;
-      onChange(el, text);
-    };
-    scan();
-    new MutationObserver(scan).observe(doc.body, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-  }
-  function waitForIframe(targets, cb) {
-    const fe = window.frameElement;
-    if (fe && (targets.includes(fe.id) || targets.includes(fe.name))) {
-      cb(fe);
-      return;
-    }
-    const scan = () => {
-      for (const i of document.querySelectorAll("iframe")) {
-        if (targets.includes(i.id) || targets.includes(i.name)) {
-          cb(i);
-          return true;
-        }
-      }
-      return false;
-    };
-    if (scan()) return;
-    const obs = new MutationObserver(() => {
-      if (scan()) obs.disconnect();
-    });
-    obs.observe(document.documentElement, { childList: true, subtree: true });
-  }
-  function waitForIframeDocument(iframe, cb) {
-    const tryAttach = () => {
-      try {
-        const doc = iframe.contentDocument;
-        if (doc && doc.body) {
-          cb(doc);
-          return true;
-        }
-      } catch {
-      }
-      return false;
-    };
-    if (tryAttach()) return;
-    iframe.addEventListener("load", tryAttach);
-  }
-  function logPrettier() {
-    waitForIframe(["PAGE_EVENTVIEWER", "mainPage"], (iframe) => {
-      waitForIframeDocument(iframe, (doc) => {
-        injectStyle(doc);
-        watchElement(doc, "div.binaryWidget pre.utf", (_, rawText) => {
-          const html = renderPretty(rawText);
-          state.lastHTML = html;
-          const win = doc.defaultView || window;
-          waitForPagecontrol(win, (pc) => {
-            ensureMaxxTab(pc, doc);
-            const el = doc.getElementById(MAXX_ID);
-            if (!el) return;
-            el.innerHTML = html;
-            if (isElementVisible(el)) {
-              hideOtherNotebookPages(doc, el);
-            } else {
-              restoreNotebookPages(doc);
-              hideMaxxNotebookPage(el);
-            }
-          });
-        });
-      });
-    });
-  }
-  var log_prettier_default = logPrettier;
-
   // src/modules/soc/siem/log_prettier/config.js
   var config_default4 = {
     name: "log-prettier module",
     // module-id: bG9nLXByZXR0aWVyIG1vZHVsZQ==
-    enabled: false,
+    enabled: true,
     match: ["*://mss.vnpt.vn/*", "*://siem.vnpt.vn/*"],
     exclude: [],
     runAt: "document-end",
@@ -719,11 +507,170 @@
     once: false,
     priority: 10,
     selector: {
-      frameTarget: ["PAGE_EVENTVIEWER", "mainPage"],
-      rawlogContainer: "div.binaryWidget",
-      rawlogPre: "pre.utf"
-    }
+      container: "div.binaryWidget",
+      pre: "pre.utf"
+    },
+    /**
+     * =========================
+     * FORMAT RULES
+     * =========================
+     * - match(raw): boolean
+     * - format(raw): string
+     */
+    formats: [
+      {
+        name: "sysmon-operational",
+        match(raw) {
+          return raw.includes("Microsoft-Windows-Sysmon/Operational");
+        },
+        format(raw) {
+          return raw.replace(/^<\d+>.*?\s(?=\w+=)/, (m) => m + "\n\n").replace(/[\r\n\t]+/g, " ").replace(/\s+(?=\w+=)/g, "\n").replace(
+            /Message=([\s\S]*?)(?=\n[A-Z][a-zA-Z]+=?|$)/,
+            (_, msg) => "Message:\n" + msg.replace(/\s+(?=[A-Z][a-zA-Z]+:)/g, "\n  ").replace(/:\s+/g, ": ").replace(/\s+(?=Parent)/g, "\n  ")
+          ).replace(/(CommandLine:)\s*(.+)/g, (_, k, v) => `${k}
+    ${v}`).replace(/(ParentCommandLine:)\s*(.+)/g, (_, k, v) => `${k}
+    ${v}`).replace(
+            /Hashes:\s*([^\n]+)/,
+            (_, hashes) => "Hashes:\n" + hashes.split(",").map((h) => "  " + h.trim()).join("\n")
+          ).replace(/(ParentProcessGuid:[^\n]+)/, (m) => m.includes("Parent Process:") ? m : "\nParent Process:\n  " + m).replace(/(ParentProcessId:[^\n]+)/, "  $1").replace(/(ParentImage:[^\n]+)/, "  $1").replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, "[IP:$&]").replace(/(CommandLine:\n\s+)(.+)/g, (_, k, v) => `${k}▶ ${v}`).replace(/([A-Z]:\\[^\s\n]+)/g, "📁 $1");
+        }
+      }
+    ]
   };
+
+  // src/modules/soc/siem/log_prettier/index.js
+  var ICON_CLASS = "mx-log-format-icon";
+  var ICON_DATA = "data-mx-raw";
+  var STYLE_ID = "mx-log-prettier-style";
+  function injectStyle(doc) {
+    if (doc.getElementById(STYLE_ID)) return;
+    const style = doc.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+		.mx-log-wrap {
+			position: relative;
+		}
+
+		.${ICON_CLASS} {
+			position: absolute;
+			top: 6px;
+			right: 6px;
+			width: 18px;
+			height: 18px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			opacity: 0.55;
+			border-radius: 50%;
+			background: rgba(37, 99, 235, 0.08);
+			transition: all 0.15s ease;
+		}
+
+		.${ICON_CLASS}:hover {
+			opacity: 1;
+			background: rgba(37, 99, 235, 0.18);
+			transform: rotate(90deg);
+		}
+
+		.${ICON_CLASS} img {
+			width: 12px;
+			height: 12px;
+			pointer-events: none;
+		}
+
+		pre.mx-formatted {
+			white-space: pre-wrap;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 13px;
+			line-height: 1.65;
+		}
+	`;
+    doc.head.appendChild(style);
+  }
+  function resolveFormat(raw) {
+    for (const rule of config_default4.formats || []) {
+      try {
+        if (rule.match(raw)) return rule.format(raw);
+      } catch (e) {
+        console.warn("[log-prettier]", rule.name, e);
+      }
+    }
+    return null;
+  }
+  function createIcon(doc) {
+    const icon = doc.createElement("span");
+    icon.className = ICON_CLASS;
+    const img = doc.createElement("img");
+    img.src = "https://cdn-icons-png.flaticon.com/512/1828/1828911.png";
+    img.alt = "format log";
+    icon.appendChild(img);
+    return icon;
+  }
+  function attach(pre) {
+    if (!pre || pre.dataset.mxBound === "1") return;
+    pre.dataset.mxBound = "1";
+    const doc = pre.ownerDocument;
+    let wrap = pre.parentElement;
+    if (!wrap.classList.contains("mx-log-wrap")) {
+      wrap = doc.createElement("div");
+      wrap.className = "mx-log-wrap";
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+    }
+    if (wrap.querySelector(`.${ICON_CLASS}`)) return;
+    const icon = createIcon(doc);
+    wrap.appendChild(icon);
+    icon.addEventListener("click", () => {
+      const raw = pre.getAttribute(ICON_DATA);
+      if (!raw) {
+        const original = pre.textContent;
+        const formatted = resolveFormat(original);
+        if (!formatted) return;
+        pre.setAttribute(ICON_DATA, original);
+        pre.textContent = formatted;
+        pre.classList.add("mx-formatted");
+      } else {
+        pre.textContent = raw;
+        pre.removeAttribute(ICON_DATA);
+        pre.classList.remove("mx-formatted");
+      }
+    });
+  }
+  function findPre(doc) {
+    const { container, pre } = config_default4.selector;
+    if (container) {
+      const wrap = doc.querySelector(container);
+      if (wrap) {
+        const p = wrap.querySelector(pre || "pre");
+        if (p) return p;
+      }
+    }
+    return doc.querySelector("#GUID_6 pre, pre.utf, pre");
+  }
+  function observe(doc) {
+    const scan = () => {
+      const pre = findPre(doc);
+      if (pre) attach(pre);
+    };
+    scan();
+    new MutationObserver(scan).observe(doc.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+  function logPrettier() {
+    try {
+      const doc = document;
+      if (!doc.body) return;
+      injectStyle(doc);
+      observe(doc);
+    } catch {
+    }
+  }
+  if (typeof __MAXX_DEV__ !== "undefined") {
+    window.__MAXX_DEV_ENTRY__ = logPrettier;
+  }
 
   // src/modules/soc/siem/hex_decoder/config.js
   var config_default5 = {
@@ -1595,7 +1542,7 @@ Tổng ticket lọc: ${tickets.length}`);
       config: config_default3
     },
     {
-      run: log_prettier_default,
+      run: logPrettier,
       config: config_default4
     },
     {

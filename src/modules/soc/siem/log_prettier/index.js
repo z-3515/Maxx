@@ -1,198 +1,156 @@
-// src/modules/soc/siem/log_prettier/index.js
+import config from "./config";
 
-const MAXX_ID = "MX_LOG_PRETTIER_PAGE";
+const ICON_CLASS = "mx-log-format-icon";
+const ICON_DATA = "data-mx-raw";
+const STYLE_ID = "mx-log-prettier-style";
 
 /* =========================
    STYLE
 ========================= */
 function injectStyle(doc) {
-	if (doc.getElementById("mx-log-prettier-style")) return;
+	if (doc.getElementById(STYLE_ID)) return;
 
 	const style = doc.createElement("style");
-	style.id = "mx-log-prettier-style";
+	style.id = STYLE_ID;
 	style.textContent = `
-		#${MAXX_ID} {
-			width: 100%;
-			height: 100%;
-			overflow: auto;
-			box-sizing: border-box;
-			padding: 6px;
+		.mx-log-wrap {
+			position: relative;
+		}
+
+		.${ICON_CLASS} {
+			position: absolute;
+			top: 6px;
+			right: 6px;
+			width: 18px;
+			height: 18px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			opacity: 0.55;
+			border-radius: 50%;
+			background: rgba(37, 99, 235, 0.08);
+			transition: all 0.15s ease;
+		}
+
+		.${ICON_CLASS}:hover {
+			opacity: 1;
+			background: rgba(37, 99, 235, 0.18);
+			transform: rotate(90deg);
+		}
+
+		.${ICON_CLASS} img {
+			width: 12px;
+			height: 12px;
+			pointer-events: none;
+		}
+
+		pre.mx-formatted {
+			white-space: pre-wrap;
 			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 			font-size: 13px;
-			line-height: 1.6;
-		}
-
-		.mx-row {
-			display: flex;
-			gap: 12px;
-			padding: 2px 0;
-		}
-
-		.mx-key {
-			min-width: 220px;
-			font-weight: 600;
-			white-space: nowrap;
-			color: #334155;
-		}
-
-		.mx-divider {
-			margin: 8px 0;
-			border-top: 1px solid #cbd5e1;
+			line-height: 1.65;
 		}
 	`;
 	doc.head.appendChild(style);
 }
 
 /* =========================
-   UTIL
+   FORMAT RESOLVER
 ========================= */
-function escapeHtml(s) {
-	return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/* =========================
-   PARSE & RENDER
-========================= */
-function parseKeyValue(raw) {
-	const out = [];
-	const re = /([A-Za-z0-9_.-]+)=([^\t\n\r]+)/g;
-	let m;
-
-	while ((m = re.exec(raw))) {
-		out.push({ k: m[1], v: m[2] });
-	}
-	return out;
-}
-
-function renderPretty(raw) {
-	const fields = parseKeyValue(raw);
-
-	if (!fields.length) {
-		return `<pre>${escapeHtml(raw)}</pre>`;
-	}
-
-	return `
-		${fields
-			.map(
-				(f) => `
-				<div class="mx-row">
-					<span class="mx-key">${f.k}</span>
-					<span>${escapeHtml(f.v)}</span>
-				</div>`
-			)
-			.join("")}
-		<hr class="mx-divider"/>
-		<details>
-			<summary>Raw</summary>
-			<pre>${escapeHtml(raw)}</pre>
-		</details>
-	`;
-}
-
-/* =========================
-   PAGECONTROL
-========================= */
-function waitForPagecontrol(win, cb, timeout = 5000) {
-	const start = Date.now();
-	const timer = setInterval(() => {
-		let pc = null;
+function resolveFormat(raw) {
+	for (const rule of config.formats || []) {
 		try {
-			pc = Object.values(win).find(
-				(v) => v && typeof v.addPage === "function" && typeof v.assignElement === "function" && typeof v.setIndex === "function" && v._tabset
-			);
-		} catch {}
-
-		if (pc) {
-			clearInterval(timer);
-			cb(pc);
-			return;
+			if (rule.match(raw)) return rule.format(raw);
+		} catch (e) {
+			console.warn("[log-prettier]", rule.name, e);
 		}
-
-		if (Date.now() - start > timeout) {
-			clearInterval(timer);
-		}
-	}, 100);
+	}
+	return null;
 }
 
 /* =========================
-   STATE
+   ICON
 ========================= */
-const state = {
-	maxxIndex: -1,
-	lastHTML: "",
-};
+function createIcon(doc) {
+	const icon = doc.createElement("span");
+	icon.className = ICON_CLASS;
 
-/* =========================
-   TAB INIT
-========================= */
-function hideMaxxNotebookPage(el) {
-	const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
-	if (page) page.style.display = "none";
+	const img = doc.createElement("img");
+	img.src = "https://cdn-icons-png.flaticon.com/512/1828/1828911.png"; // reload icon
+	img.alt = "format log";
+
+	icon.appendChild(img);
+	return icon;
 }
 
-function ensureMaxxTab(pc, doc) {
-	if (state.maxxIndex !== -1) return;
+/* =========================
+   ATTACH
+========================= */
+function attach(pre) {
+	if (!pre || pre.dataset.mxBound === "1") return;
+	pre.dataset.mxBound = "1";
 
-	pc.addPage({ text: "maxx", type: "DIV" });
-	state.maxxIndex = pc.pages.length - 1;
+	const doc = pre.ownerDocument;
 
-	let el = doc.getElementById(MAXX_ID);
-	if (!el) {
-		el = doc.createElement("div");
-		el.id = MAXX_ID;
-		el.textContent = "⏳ waiting log...";
-		doc.body.appendChild(el);
+	// wrap pre nếu chưa có
+	let wrap = pre.parentElement;
+	if (!wrap.classList.contains("mx-log-wrap")) {
+		wrap = doc.createElement("div");
+		wrap.className = "mx-log-wrap";
+		pre.parentNode.insertBefore(wrap, pre);
+		wrap.appendChild(pre);
 	}
 
-	pc.assignElement({
-		id: MAXX_ID,
-		index: state.maxxIndex,
-	});
+	// tránh duplicate icon
+	if (wrap.querySelector(`.${ICON_CLASS}`)) return;
 
-	// 🔴 quan trọng: KHÔNG cho maxx chiếm chỗ mặc định
-	hideMaxxNotebookPage(el);
-}
+	const icon = createIcon(doc);
+	wrap.appendChild(icon);
 
-/* =========================
-   NOTEBOOKPAGE VISIBILITY
-========================= */
-function isElementVisible(el) {
-	if (!el) return false;
-	const page = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
-	if (!page) return false;
-	if (page.style.display === "none") return false;
-	return page.offsetWidth > 0 && page.offsetHeight > 0;
-}
+	icon.addEventListener("click", () => {
+		const raw = pre.getAttribute(ICON_DATA);
 
-function hideOtherNotebookPages(doc, el) {
-	const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
-	const myPage = el.closest(".DA_NOTEBOOKPAGE, .da-notebookpage");
+		if (!raw) {
+			const original = pre.textContent;
+			const formatted = resolveFormat(original);
+			if (!formatted) return;
 
-	pages.forEach((p) => {
-		p.style.display = p === myPage ? "" : "none";
+			pre.setAttribute(ICON_DATA, original);
+			pre.textContent = formatted;
+			pre.classList.add("mx-formatted");
+		} else {
+			pre.textContent = raw;
+			pre.removeAttribute(ICON_DATA);
+			pre.classList.remove("mx-formatted");
+		}
 	});
 }
 
-function restoreNotebookPages(doc) {
-	const pages = doc.querySelectorAll(".DA_NOTEBOOKPAGE, .da-notebookpage");
-	pages.forEach((p) => (p.style.display = ""));
+/* =========================
+   FIND PRE
+========================= */
+function findPre(doc) {
+	const { container, pre } = config.selector;
+
+	if (container) {
+		const wrap = doc.querySelector(container);
+		if (wrap) {
+			const p = wrap.querySelector(pre || "pre");
+			if (p) return p;
+		}
+	}
+
+	return doc.querySelector("#GUID_6 pre, pre.utf, pre");
 }
 
 /* =========================
-   WATCH RAW LOG
+   OBSERVER
 ========================= */
-function watchElement(doc, selector, onChange) {
-	let lastText = null;
-
+function observe(doc) {
 	const scan = () => {
-		const el = doc.querySelector(selector);
-		if (!el) return;
-
-		const text = el.textContent || "";
-		if (text === lastText) return;
-
-		lastText = text;
-		onChange(el, text);
+		const pre = findPre(doc);
+		if (pre) attach(pre);
 	};
 
 	scan();
@@ -200,87 +158,25 @@ function watchElement(doc, selector, onChange) {
 	new MutationObserver(scan).observe(doc.body, {
 		childList: true,
 		subtree: true,
-		characterData: true,
 	});
-}
-
-/* =========================
-   IFRAME HELPERS
-========================= */
-function waitForIframe(targets, cb) {
-	const fe = window.frameElement;
-	if (fe && (targets.includes(fe.id) || targets.includes(fe.name))) {
-		cb(fe);
-		return;
-	}
-
-	const scan = () => {
-		for (const i of document.querySelectorAll("iframe")) {
-			if (targets.includes(i.id) || targets.includes(i.name)) {
-				cb(i);
-				return true;
-			}
-		}
-		return false;
-	};
-
-	if (scan()) return;
-
-	const obs = new MutationObserver(() => {
-		if (scan()) obs.disconnect();
-	});
-	obs.observe(document.documentElement, { childList: true, subtree: true });
-}
-
-function waitForIframeDocument(iframe, cb) {
-	const tryAttach = () => {
-		try {
-			const doc = iframe.contentDocument;
-			if (doc && doc.body) {
-				cb(doc);
-				return true;
-			}
-		} catch {}
-		return false;
-	};
-
-	if (tryAttach()) return;
-	iframe.addEventListener("load", tryAttach);
 }
 
 /* =========================
    ENTRY
 ========================= */
-function logPrettier() {
-	waitForIframe(["PAGE_EVENTVIEWER", "mainPage"], (iframe) => {
-		waitForIframeDocument(iframe, (doc) => {
-			injectStyle(doc);
+export default function logPrettier() {
+	try {
+		const doc = document;
+		if (!doc.body) return;
 
-			watchElement(doc, "div.binaryWidget pre.utf", (_, rawText) => {
-				const html = renderPretty(rawText);
-				state.lastHTML = html;
-
-				const win = doc.defaultView || window;
-				waitForPagecontrol(win, (pc) => {
-					ensureMaxxTab(pc, doc);
-
-					const el = doc.getElementById(MAXX_ID);
-					if (!el) return;
-
-					// luôn render (giống bản stable)
-					el.innerHTML = html;
-
-					// chỉ khi user đang ở tab maxx thì mới chiếm layout
-					if (isElementVisible(el)) {
-						hideOtherNotebookPages(doc, el);
-					} else {
-						restoreNotebookPages(doc);
-						hideMaxxNotebookPage(el);
-					}
-				});
-			});
-		});
-	});
+		injectStyle(doc);
+		observe(doc);
+	} catch {}
 }
 
-export default logPrettier;
+/* =========================
+   DEV ENTRY
+========================= */
+if (typeof __MAXX_DEV__ !== "undefined") {
+	window.__MAXX_DEV_ENTRY__ = logPrettier;
+}
