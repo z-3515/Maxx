@@ -37,23 +37,23 @@ export default {
 				return (
 					raw
 						/* =========================
-			   HEADER
-			========================= */
+                                    HEADER
+                        ========================= */
 						.replace(/^<\d+>.*?\s(?=\w+=)/, (m) => m + "\n\n")
 
 						/* =========================
-			   NORMALIZE
-			========================= */
+                                NORMALIZE
+                        ========================= */
 						.replace(/[\r\n\t]+/g, " ")
 
 						/* =========================
-			   KEY=VALUE
-			========================= */
+                                KEY=VALUE
+                        ========================= */
 						.replace(/\s+(?=\w+=)/g, "\n")
 
 						/* =========================
-			   MESSAGE BLOCK
-			========================= */
+                                MESSAGE BLOCK
+                        ========================= */
 						.replace(
 							/Message=([\s\S]*?)(?=\n[A-Z][a-zA-Z]+=?|$)/,
 							(_, msg) =>
@@ -65,14 +65,14 @@ export default {
 						)
 
 						/* =========================
-			   COMMAND LINE
-			========================= */
+                                COMMAND LINE
+                        ========================= */
 						.replace(/(CommandLine:)\s*(.+)/g, (_, k, v) => `${k}\n    ${v}`)
 						.replace(/(ParentCommandLine:)\s*(.+)/g, (_, k, v) => `${k}\n    ${v}`)
 
 						/* =========================
-			   HASHES
-			========================= */
+                                    HASHES
+                        ========================= */
 						.replace(
 							/Hashes:\s*([^\n]+)/,
 							(_, hashes) =>
@@ -84,14 +84,14 @@ export default {
 						)
 
 						/* =========================
-			   GROUP PARENT PROCESS
-			========================= */
+                            GROUP PARENT PROCESS
+                        ========================= */
 						.replace(/(ParentProcessGuid:[^\n]+)/, (m) => (m.includes("Parent Process:") ? m : "\nParent Process:\n  " + m))
 						.replace(/(ParentProcessId:[^\n]+)/, "  $1")
 						.replace(/(ParentImage:[^\n]+)/, "  $1")
 						/* =========================
-   VISUAL HINTS
-========================= */
+                                VISUAL HINTS
+                        ========================= */
 						.replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, "[IP:$&]")
 						.replace(/(CommandLine:\n\s+)(.+)/g, (_, k, v) => `${k}▶ ${v}`)
 						.replace(/([A-Z]:\\[^\s\n]+)/g, "📁 $1")

@@ -16,29 +16,36 @@ import hexDecoderConfig from "./modules/soc/siem/hex_decoder/config.js";
 import noteShift from "./modules/soc/ticket/note_shift/index.js";
 import noteShiftConfig from "./modules/soc/ticket/note_shift/config.js";
 
+import closeTicket from "./modules/soc/ticket/close_ticket/index.js";
+import closeTicketConfig from "./modules/soc/ticket/close_ticket/config.js";
+
 export default [
-    {
-        run: test,
-        config: testConfig,
-    },
-    {
-        run: selectedSearch,
-        config: selectedSearchConfig,
-    },
-    {
-        run: offenseWhitelistHighlighter,
-        config: offenseWhitelistHighlighterConfig,
-    },
-    {
-        run: logPrettier,
-        config: logPrettierConfig,
-    },
-    {
-        run: runHexDecoderModule,
-        config: hexDecoderConfig,
-    },
-    {
-        run: noteShift,
-        config: noteShiftConfig,
-    },
+	{
+		run: test,
+		config: testConfig,
+	},
+	{
+		run: selectedSearch,
+		config: selectedSearchConfig,
+	},
+	{
+		run: offenseWhitelistHighlighter,
+		config: offenseWhitelistHighlighterConfig,
+	},
+	{
+		run: logPrettier,
+		config: logPrettierConfig,
+	},
+	{
+		run: runHexDecoderModule,
+		config: hexDecoderConfig,
+	},
+	{
+		run: noteShift,
+		config: noteShiftConfig,
+	},
+	{
+		run: closeTicket,
+		config: closeTicketConfig,
+	},
 ];
