@@ -22,30 +22,8 @@
 
 
 (() => {
-  // src/modules/test/index.js
-  function runTestModule(ctx) {
-  }
-
-  // src/modules/test/config.js
-  var config_default = {
-    name: "test-module",
-    // module-id: dGVzdC1tb2R1bGU=
-    enabled: true,
-    // 🔥 bật / tắt nhanh
-    match: ["*://*.google.com/*", "*://localhost/*"],
-    exclude: ["*://mail.google.com/*"],
-    runAt: "document-end",
-    // document-start | document-end | idle
-    iframe: false,
-    // false = chỉ chạy top window
-    once: true,
-    // true = chỉ chạy 1 lần / page
-    priority: 10
-    // số lớn chạy trước (dùng khi tool phụ thuộc nhau)
-  };
-
   // src/modules/selected_search/config.js
-  var config_default2 = {
+  var config_default = {
     name: "selected-search module",
     // module-id: c2VsZWN0ZWQtc2VhcmNoIG1vZHVsZQ==
     enabled: true,
@@ -143,8 +121,8 @@
     return /^[a-f0-9]{32}$/i.test(text) || /^[a-f0-9]{40}$/i.test(text) || /^[a-f0-9]{64}$/i.test(text);
   }
   function selectedSearch(ctx) {
-    if (!config_default2.enabled) return;
-    const { engines, ui } = config_default2;
+    if (!config_default.enabled) return;
+    const { engines, ui } = config_default;
     const url = ctx?.url || location.href;
     let box = null;
     let initialized = false;
@@ -307,7 +285,7 @@
   }
 
   // src/modules/soc/siem/offense_whitelist_highlighter/config.js
-  var config_default3 = {
+  var config_default2 = {
     /* ==========================
             MODULE META
     ========================== */
@@ -386,11 +364,11 @@
 
   // src/modules/soc/siem/offense_whitelist_highlighter/index.js
   function offenseWhitelistHighlighter(ctx) {
-    if (!config_default3.enabled) return;
-    if (config_default3.iframe && !isActiveIframe()) return;
+    if (!config_default2.enabled) return;
+    if (config_default2.iframe && !isActiveIframe()) return;
     const url = ctx.url || location.href;
     const isMSS = url.includes("mss.");
-    const rawWhitelist = isMSS ? config_default3.mss.whitelist : config_default3.siem.whitelist;
+    const rawWhitelist = isMSS ? config_default2.mss.whitelist : config_default2.siem.whitelist;
     if (!Array.isArray(rawWhitelist) || rawWhitelist.length === 0) return;
     const whitelist = rawWhitelist.map((k) => k?.toLowerCase().trim()).filter(Boolean);
     if (whitelist.length === 0) return;
@@ -468,7 +446,7 @@
       }
     }
     function initObserver() {
-      const tbody = document.querySelector(config_default3.selector.tbody);
+      const tbody = document.querySelector(config_default2.selector.tbody);
       if (!tbody) return;
       let scheduled = false;
       observeElement(tbody, (mutations) => {
@@ -486,10 +464,10 @@
     }
     let retry = 0;
     const timer = setInterval(() => {
-      const table = document.querySelector(config_default3.selector.table);
+      const table = document.querySelector(config_default2.selector.table);
       if (table) {
         clearInterval(timer);
-        document.querySelectorAll(config_default3.selector.rows).forEach(processRow);
+        document.querySelectorAll(config_default2.selector.rows).forEach(processRow);
         initObserver();
       }
       if (++retry > 20) clearInterval(timer);
@@ -497,7 +475,7 @@
   }
 
   // src/modules/soc/siem/log_prettier/config.js
-  var config_default4 = {
+  var config_default3 = {
     name: "log-prettier module",
     // module-id: bG9nLXByZXR0aWVyIG1vZHVsZQ==
     enabled: true,
@@ -590,7 +568,7 @@
     doc.head.appendChild(style);
   }
   function resolveFormat(raw) {
-    for (const rule of config_default4.formats || []) {
+    for (const rule of config_default3.formats || []) {
       try {
         if (rule.match(raw)) return rule.format(raw);
       } catch (e) {
@@ -639,7 +617,7 @@
     });
   }
   function findPre(doc) {
-    const { container, pre } = config_default4.selector;
+    const { container, pre } = config_default3.selector;
     if (container) {
       const wrap = doc.querySelector(container);
       if (wrap) {
@@ -674,7 +652,7 @@
   }
 
   // src/modules/soc/siem/hex_decoder/config.js
-  var config_default5 = {
+  var config_default4 = {
     name: "hex-decoder module",
     // module-id: aGV4LWRlY29kZXIgbW9kdWxl
     enabled: true,
@@ -694,7 +672,7 @@
 
   // src/modules/soc/siem/hex_decoder/index.js
   function runHexDecoderModule(ctx) {
-    const sel = config_default5.selector;
+    const sel = config_default4.selector;
     function isAllowedIframe() {
       if (!sel.iframeId || !sel.iframeId.length) return false;
       const frame = window.frameElement;
@@ -808,7 +786,7 @@
   }
 
   // src/modules/soc/ticket/note_shift/config.js
-  var config_default6 = {
+  var config_default5 = {
     name: "test-module",
     // module-id: dGVzdC1tb2R1bGU=
     enabled: true,
@@ -956,7 +934,7 @@ ${text}`
 
   // src/modules/soc/ticket/note_shift/index.js
   async function fetchAllTickets(target) {
-    const api = config_default6.api.all_ticket;
+    const api = config_default5.api.all_ticket;
     return zammadFetch(api);
   }
   function injectNoteShiftStyle() {
@@ -1407,7 +1385,7 @@ ${text}`
     return number;
   }
   async function processData({ target, startTime, endTime, shiftLabel }) {
-    const { STATE_LABEL, SPECIAL_ORG } = config_default6.mapping;
+    const { STATE_LABEL, SPECIAL_ORG } = config_default5.mapping;
     const data = await fetchAllTickets(target);
     if (!data || !data.assets || !data.assets.Ticket) {
       throw new Error("SESSION_INVALID_OR_NOT_LOGIN");
@@ -1512,11 +1490,11 @@ Tổng ticket lọc: ${tickets.length}`);
     };
   }
   function noteShift(ctx) {
-    if (!config_default6.enabled) return;
+    if (!config_default5.enabled) return;
     observeWhenVisible(
       ".overview-table .page-header",
       (pageHeaderEl) => {
-        noteShiftBtn(config_default6, pageHeaderEl);
+        noteShiftBtn(config_default5, pageHeaderEl);
       },
       {
         debounce: 150
@@ -1529,7 +1507,7 @@ Tổng ticket lọc: ${tickets.length}`);
   }
 
   // src/modules/soc/ticket/close_ticket/config.js
-  var config_default7 = {
+  var config_default6 = {
     name: "close-ticket module",
     // module-id: Y2xvc2UtdGlja2V0IG1vZHVsZQ==
     enabled: true,
@@ -1628,7 +1606,7 @@ Tổng ticket lọc: ${tickets.length}`);
       console.warn('[close-ticket] Không tìm thấy <.form-control[name="state_id"]>');
       return;
     }
-    stateControl.value = config_default7.options.state.closed;
+    stateControl.value = config_default6.options.state.closed;
     stateControl.dispatchEvent(new Event("change", { bubbles: true }));
     const updateButton = document.querySelector(".js-submitDropdown > button.js-submit");
     if (!updateButton) {
@@ -1641,7 +1619,7 @@ Tổng ticket lọc: ${tickets.length}`);
   function isTicketClosed() {
     const stateControl = document.querySelector('.form-control[name="state_id"]');
     if (!stateControl) return false;
-    return String(stateControl.value) === String(config_default7.options.state.closed);
+    return String(stateControl.value) === String(config_default6.options.state.closed);
   }
   function disconnectObserver() {
     if (domObserver) {
@@ -1657,7 +1635,7 @@ Tổng ticket lọc: ${tickets.length}`);
       return false;
     }
     const currentGroupId = String(groupInput.value);
-    const allowedGroupId = String(config_default7.options.organization.TT_ATTT);
+    const allowedGroupId = String(config_default6.options.organization.TT_ATTT);
     return currentGroupId === allowedGroupId;
   }
   function observeDOM() {
@@ -1684,7 +1662,7 @@ Tổng ticket lọc: ${tickets.length}`);
     });
   }
   function closeTicket(ctx) {
-    if (!config_default7.enabled) return;
+    if (!config_default6.enabled) return;
     injectStyleCSS();
     currentTicketId = getTicketId();
     injectCloseButton();
@@ -1696,33 +1674,33 @@ Tổng ticket lọc: ${tickets.length}`);
 
   // src/registry.js
   var registry_default = [
+    // {
+    // 	run: test,
+    // 	config: testConfig,
+    // },
     {
-      run: runTestModule,
+      run: selectedSearch,
       config: config_default
     },
     {
-      run: selectedSearch,
+      run: offenseWhitelistHighlighter,
       config: config_default2
     },
     {
-      run: offenseWhitelistHighlighter,
+      run: logPrettier,
       config: config_default3
     },
     {
-      run: logPrettier,
+      run: runHexDecoderModule,
       config: config_default4
     },
     {
-      run: runHexDecoderModule,
+      run: noteShift,
       config: config_default5
     },
     {
-      run: noteShift,
-      config: config_default6
-    },
-    {
       run: closeTicket,
-      config: config_default7
+      config: config_default6
     }
   ];
 

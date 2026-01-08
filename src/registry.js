@@ -20,10 +20,10 @@ import closeTicket from "./modules/soc/ticket/close_ticket/index.js";
 import closeTicketConfig from "./modules/soc/ticket/close_ticket/config.js";
 
 export default [
-	{
-		run: test,
-		config: testConfig,
-	},
+	// {
+	// 	run: test,
+	// 	config: testConfig,
+	// },
 	{
 		run: selectedSearch,
 		config: selectedSearchConfig,
