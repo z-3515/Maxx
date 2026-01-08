@@ -1564,8 +1564,6 @@ Tổng ticket lọc: ${tickets.length}`);
 
     /* ===== DISABLED STATE ===== */
     .tabsSidebar-action.disabled {
-        pointer-events: none;
-        opacity: 0.4;
         cursor: not-allowed;
     }
   `;
@@ -1601,6 +1599,11 @@ Tổng ticket lọc: ${tickets.length}`);
   function onCloseButtonClick() {
     if (isTicketClosed()) return;
     if (!isAllowedGroup()) return;
+    const closeBtn = document.querySelector(".tabsSidebar-action");
+    if (closeBtn) {
+      closeBtn.classList.add("disabled");
+      closeBtn.title = "Ticket đang được đóng...";
+    }
     const stateControl = document.querySelector('.form-control[name="state_id"]');
     if (!stateControl) {
       console.warn('[close-ticket] Không tìm thấy <.form-control[name="state_id"]>');
@@ -1614,19 +1617,11 @@ Tổng ticket lọc: ${tickets.length}`);
       return;
     }
     updateButton.click();
-    setTimeout(disconnectObserver, 500);
   }
   function isTicketClosed() {
     const stateControl = document.querySelector('.form-control[name="state_id"]');
     if (!stateControl) return false;
     return String(stateControl.value) === String(config_default6.options.state.closed);
-  }
-  function disconnectObserver() {
-    if (domObserver) {
-      domObserver.disconnect();
-      domObserver = null;
-      console.log("[close-ticket] DOM observer disconnected");
-    }
   }
   function isAllowedGroup() {
     const groupInput = document.querySelector('.form-group[data-attribute-name="group_id"] input.searchableSelect-shadow');
@@ -1637,6 +1632,10 @@ Tổng ticket lọc: ${tickets.length}`);
     const currentGroupId = String(groupInput.value);
     const allowedGroupId = String(config_default6.options.organization.TT_ATTT);
     return currentGroupId === allowedGroupId;
+  }
+  function resetCloseButton() {
+    const oldBtn = document.querySelector(".tabsSidebar-action");
+    if (oldBtn) oldBtn.remove();
   }
   function observeDOM() {
     if (domObserver) return;
@@ -1650,6 +1649,7 @@ Tổng ticket lọc: ${tickets.length}`);
         if (newTicketId && newTicketId !== currentTicketId) {
           console.log(`[close-ticket] Ticket changed: ${currentTicketId} → ${newTicketId}`);
           currentTicketId = newTicketId;
+          resetCloseButton();
           injectCloseButton();
           return;
         }

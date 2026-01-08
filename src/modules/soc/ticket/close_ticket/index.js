@@ -50,8 +50,6 @@ function injectStyleCSS() {
 
     /* ===== DISABLED STATE ===== */
     .tabsSidebar-action.disabled {
-        pointer-events: none;
-        opacity: 0.4;
         cursor: not-allowed;
     }
   `;
@@ -106,6 +104,12 @@ function onCloseButtonClick() {
 	if (isTicketClosed()) return;
 	if (!isAllowedGroup()) return;
 
+	const closeBtn = document.querySelector(".tabsSidebar-action");
+	if (closeBtn) {
+		closeBtn.classList.add("disabled");
+		closeBtn.title = "Ticket đang được đóng...";
+	}
+
 	const stateControl = document.querySelector('.form-control[name="state_id"]');
 	if (!stateControl) {
 		console.warn('[close-ticket] Không tìm thấy <.form-control[name="state_id"]>');
@@ -122,8 +126,6 @@ function onCloseButtonClick() {
 	}
 
 	updateButton.click();
-
-	setTimeout(disconnectObserver, 500);
 }
 
 /* =========================
@@ -158,6 +160,11 @@ function isAllowedGroup() {
 	return currentGroupId === allowedGroupId;
 }
 
+function resetCloseButton() {
+	const oldBtn = document.querySelector(".tabsSidebar-action");
+	if (oldBtn) oldBtn.remove();
+}
+
 /* =========================
    Mutation Observer (SPA)
 ========================= */
@@ -173,11 +180,13 @@ function observeDOM() {
 		requestAnimationFrame(() => {
 			scheduled = false;
 
-			// Detect ticket change
 			const newTicketId = getTicketId();
+
+			// ===== TICKET CHANGED =====
 			if (newTicketId && newTicketId !== currentTicketId) {
 				console.log(`[close-ticket] Ticket changed: ${currentTicketId} → ${newTicketId}`);
 				currentTicketId = newTicketId;
+				resetCloseButton();
 				injectCloseButton();
 				return;
 			}
