@@ -20,6 +20,7 @@
   // src/modules/soc/ticket/note_shift/config.js
   var config_default = {
     name: "test-module",
+    // module-id: dGVzdC1tb2R1bGU=
     enabled: true,
     match: ["*://ticket.vnpt.vn/*", "*://dashboard-soc.vnpt.vn/ticket/*"],
     exclude: [],
@@ -71,6 +72,31 @@
         125: "VNPOST",
         132: "CIC",
         3: "ABBank"
+      },
+      CATEGORY_LABEL: {
+        base: {
+          "Scan Web": ["scan web", "lỗ hổng", "rà quét lỗ hổng", "scan port", "scan hệ thống website"],
+          Bruteforce: ["bruteforce"],
+          Command: ["command", "thực thi lệnh"],
+          "Kata alert": ["kata"],
+          "Change password": ["đổi mật khẩu"],
+          Malware: ["mã độc", "malware"],
+          "ngừng đẩy log": ["ngừng đẩy log"],
+          "create file": ["tạo file", "create file"],
+          "xác minh hành vi": ["xác minh hành vi"]
+        },
+        /**
+         * Target-specific overrides / extensions
+         * ưu tiên match trước base
+         */
+        mss: {
+          "lock acc": ["khóa tài khoản"],
+          "create acc": ["tạo mới tài khoản", "create user"]
+        },
+        siem: {
+          // hiện chưa có rule riêng cho siem
+          // sau này thêm vào đây
+        }
       }
     }
   };
@@ -376,9 +402,7 @@ ${text}`
   }
   __name(injectNoteShiftStyle, "injectNoteShiftStyle");
   function toggleOverviewHeaderTitle(isNoteShiftOn) {
-    const titleEl = document.querySelector(
-      ".overview-table .page-header .page-header-title h2"
-    );
+    const titleEl = document.querySelector(".overview-table .page-header .page-header-title h2");
     if (!titleEl) return;
     if (!titleEl.dataset.maxxOriginTitle) {
       titleEl.dataset.maxxOriginTitle = titleEl.textContent;
@@ -456,6 +480,17 @@ ${text}`
     };
   }
   __name(getShiftTime, "getShiftTime");
+  function matchCategoryByMap(title, map) {
+    if (!map || typeof map !== "object") return null;
+    for (const [category, keywords] of Object.entries(map)) {
+      if (!Array.isArray(keywords)) continue;
+      if (keywords.some((kw) => typeof kw === "string" && title.includes(kw))) {
+        return category;
+      }
+    }
+    return null;
+  }
+  __name(matchCategoryByMap, "matchCategoryByMap");
   var TZ_OFFSET_MIN = 0 * 60;
   function toLocalDateTimeInput(date) {
     const local = new Date(date.getTime() + TZ_OFFSET_MIN * 6e4);
@@ -559,34 +594,22 @@ ${text}`
   __name(renderNoteShiftTimePicker, "renderNoteShiftTimePicker");
   function filterCategory(target, ticket) {
     const title = ticket.title?.toLowerCase() || "";
-    const base = /* @__PURE__ */ __name(() => {
-      if (title.includes("scan web") || title.includes("lỗ hổng"))
-        return "Scan Web";
-      if (title.includes("bruteforce")) return "Bruteforce";
-      if (title.includes("command") || title.includes("thực thi lệnh"))
-        return "Command";
-      if (title.includes("kata")) return "Kata alert";
-      if (title.includes("đổi mật khẩu")) return "Change password";
-      if (title.includes("mã độc") || title.includes("malware"))
-        return "Malware";
-      if (title.includes("ngừng đẩy log")) return "ngừng đẩy log";
-      if (title.includes("tạo file") || title.includes("create file"))
-        return "create file";
-      return "re-check";
-    }, "base");
-    if (target === "mss") {
-      if (title.includes("khóa tài khoản")) return "lock acc";
-      if (title.includes("tạo mới tài khoản") || title.includes("create user"))
-        return "create acc";
+    const CATEGORY = config_default?.mapping?.CATEGORY_LABEL;
+    if (!CATEGORY) return "re-check";
+    if (target && CATEGORY[target]) {
+      const targetMatch = matchCategoryByMap(title, CATEGORY[target]);
+      if (targetMatch) return targetMatch;
     }
-    return base();
+    if (CATEGORY.base) {
+      const baseMatch = matchCategoryByMap(title, CATEGORY.base);
+      if (baseMatch) return baseMatch;
+    }
+    return "re-check";
   }
   __name(filterCategory, "filterCategory");
   function groupTicketsString(target, tickets) {
     if (!tickets.length) return "";
-    tickets.sort(
-      (a, b) => filterCategory(target, a).localeCompare(filterCategory(target, b))
-    );
+    tickets.sort((a, b) => filterCategory(target, a).localeCompare(filterCategory(target, b)));
     let result = "";
     let current = "";
     let temp = [];
@@ -715,9 +738,7 @@ ${text}`
 Danh sách Re-check:
 `;
       recheckTickets.forEach((t) => {
-        recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(
-          t.title
-        )}
+        recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(t.title)}
 `;
       });
     }

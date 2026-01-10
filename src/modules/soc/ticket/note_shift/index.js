@@ -3,16 +3,16 @@ import { zammadFetch } from "../helper/zammad_api.js";
 import { observeWhenVisible } from "../helper/domObserver.js";
 
 async function fetchAllTickets(target) {
-    const api = config.api.all_ticket;
-    return zammadFetch(api);
+	const api = config.api.all_ticket;
+	return zammadFetch(api);
 }
 
 function injectNoteShiftStyle() {
-    if (document.getElementById("maxx-note-style")) return;
+	if (document.getElementById("maxx-note-style")) return;
 
-    const style = document.createElement("style");
-    style.id = "maxx-note-style";
-    style.textContent = `
+	const style = document.createElement("style");
+	style.id = "maxx-note-style";
+	style.textContent = `
 /* ===============================
    NOTE GIAO CA – THEME MATCH
 ================================ */
@@ -207,142 +207,151 @@ function injectNoteShiftStyle() {
 
 
     `;
-    document.head.appendChild(style);
+	document.head.appendChild(style);
 }
 
 function toggleOverviewHeaderTitle(isNoteShiftOn) {
-    const titleEl = document.querySelector(
-        ".overview-table .page-header .page-header-title h2"
-    );
-    if (!titleEl) return;
+	const titleEl = document.querySelector(".overview-table .page-header .page-header-title h2");
+	if (!titleEl) return;
 
-    // cache title gốc
-    if (!titleEl.dataset.maxxOriginTitle) {
-        titleEl.dataset.maxxOriginTitle = titleEl.textContent;
-    }
+	// cache title gốc
+	if (!titleEl.dataset.maxxOriginTitle) {
+		titleEl.dataset.maxxOriginTitle = titleEl.textContent;
+	}
 
-    if (isNoteShiftOn) {
-        titleEl.textContent = "Note Giao Ca";
-    } else {
-        titleEl.textContent = titleEl.dataset.maxxOriginTitle;
-    }
+	if (isNoteShiftOn) {
+		titleEl.textContent = "Note Giao Ca";
+	} else {
+		titleEl.textContent = titleEl.dataset.maxxOriginTitle;
+	}
 }
 
 function toggleNoteShiftScreen() {
-    const pageContent = document.querySelector(".overview-table .page-content");
-    const tableOverview = pageContent?.querySelector(".table-overview");
-    if (!pageContent || !tableOverview) return;
+	const pageContent = document.querySelector(".overview-table .page-content");
+	const tableOverview = pageContent?.querySelector(".table-overview");
+	if (!pageContent || !tableOverview) return;
 
-    let screen = pageContent.querySelector(".maxx-note-shift-screen");
+	let screen = pageContent.querySelector(".maxx-note-shift-screen");
 
-    // ===== OFF → ON =====
-    if (!screen) {
-        screen = document.createElement("div");
-        screen.className = "maxx-note-shift-screen";
+	// ===== OFF → ON =====
+	if (!screen) {
+		screen = document.createElement("div");
+		screen.className = "maxx-note-shift-screen";
 
-        tableOverview.style.display = "none";
-        pageContent.appendChild(screen);
+		tableOverview.style.display = "none";
+		pageContent.appendChild(screen);
 
-        toggleOverviewHeaderTitle(true);
+		toggleOverviewHeaderTitle(true);
 
-        injectNoteShiftStyle();
-        renderNoteShiftTimePicker(screen, async ({ start, end }) => {
-            return `✔ Note giao ca từ ${start} đến ${end}`;
-        });
+		injectNoteShiftStyle();
+		renderNoteShiftTimePicker(screen, async ({ start, end }) => {
+			return `✔ Note giao ca từ ${start} đến ${end}`;
+		});
 
-        return;
-    }
+		return;
+	}
 
-    // ===== ON → OFF =====
-    screen.remove();
-    tableOverview.style.display = "";
-    toggleOverviewHeaderTitle(false);
+	// ===== ON → OFF =====
+	screen.remove();
+	tableOverview.style.display = "";
+	toggleOverviewHeaderTitle(false);
 }
 
 function noteShiftBtn(config, pageHeaderEl) {
-    if (!pageHeaderEl) return;
+	if (!pageHeaderEl) return;
 
-    if (pageHeaderEl.querySelector(".maxx-btn-note-shift")) {
-        return;
-    }
+	if (pageHeaderEl.querySelector(".maxx-btn-note-shift")) {
+		return;
+	}
 
-    const btnNoteShift = document.createElement("button");
-    btnNoteShift.innerText = "Note Giao Ca";
-    btnNoteShift.className = "maxx-btn-note-shift";
+	const btnNoteShift = document.createElement("button");
+	btnNoteShift.innerText = "Note Giao Ca";
+	btnNoteShift.className = "maxx-btn-note-shift";
 
-    for (const [key, value] of Object.entries(config.style.btnNoteShift)) {
-        btnNoteShift.style[key] = value;
-    }
+	for (const [key, value] of Object.entries(config.style.btnNoteShift)) {
+		btnNoteShift.style[key] = value;
+	}
 
-    pageHeaderEl.appendChild(btnNoteShift);
+	pageHeaderEl.appendChild(btnNoteShift);
 
-    btnNoteShift.onclick = () => {
-        toggleNoteShiftScreen();
-        btnNoteShift.classList.toggle("active");
-        btnNoteShift.innerText = btnNoteShift.classList.contains("active")
-            ? "Quay lại"
-            : "Note Giao Ca";
-    };
+	btnNoteShift.onclick = () => {
+		toggleNoteShiftScreen();
+		btnNoteShift.classList.toggle("active");
+		btnNoteShift.innerText = btnNoteShift.classList.contains("active") ? "Quay lại" : "Note Giao Ca";
+	};
 }
 
 function getShiftTime(shift) {
-    const now = new Date();
+	const now = new Date();
 
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const yesterday = new Date(today.getTime() - 86400000);
+	const yesterday = new Date(today.getTime() - 86400000);
 
-    let start, end;
+	let start, end;
 
-    switch (shift) {
-        case 1: // 06:00 - 14:00 hôm nay
-            start = new Date(today.setHours(6, 0, 0, 0));
-            end = new Date(today.setHours(14, 0, 0, 0));
-            break;
+	switch (shift) {
+		case 1: // 06:00 - 14:00 hôm nay
+			start = new Date(today.setHours(6, 0, 0, 0));
+			end = new Date(today.setHours(14, 0, 0, 0));
+			break;
 
-        case 2: // 14:00 - 22:00 hôm nay
-            start = new Date(today.setHours(14, 0, 0, 0));
-            end = new Date(today.setHours(22, 0, 0, 0));
-            break;
+		case 2: // 14:00 - 22:00 hôm nay
+			start = new Date(today.setHours(14, 0, 0, 0));
+			end = new Date(today.setHours(22, 0, 0, 0));
+			break;
 
-        case 3: // 22:00 hôm qua - 06:00 hôm nay
-            start = new Date(yesterday.setHours(22, 0, 0, 0));
-            end = new Date(today.setHours(6, 0, 0, 0));
-            break;
-    }
+		case 3: // 22:00 hôm qua - 06:00 hôm nay
+			start = new Date(yesterday.setHours(22, 0, 0, 0));
+			end = new Date(today.setHours(6, 0, 0, 0));
+			break;
+	}
 
-    return {
-        start: toLocalDateTimeInput(start),
-        end: toLocalDateTimeInput(end),
-    };
+	return {
+		start: toLocalDateTimeInput(start),
+		end: toLocalDateTimeInput(end),
+	};
+}
+
+function matchCategoryByMap(title, map) {
+	if (!map || typeof map !== "object") return null;
+
+	for (const [category, keywords] of Object.entries(map)) {
+		if (!Array.isArray(keywords)) continue;
+
+		if (keywords.some((kw) => typeof kw === "string" && title.includes(kw))) {
+			return category;
+		}
+	}
+	return null;
 }
 
 const TZ_OFFSET_MIN = 0 * 60;
 
 function toLocalDateTimeInput(date) {
-    const local = new Date(date.getTime() + TZ_OFFSET_MIN * 60000);
-    const pad = (n) => String(n).padStart(2, "0");
+	const local = new Date(date.getTime() + TZ_OFFSET_MIN * 60000);
+	const pad = (n) => String(n).padStart(2, "0");
 
-    return (
-        local.getFullYear() +
-        "-" +
-        pad(local.getMonth() + 1) +
-        "-" +
-        pad(local.getDate()) +
-        "T" +
-        pad(local.getHours()) +
-        ":" +
-        pad(local.getMinutes())
-    );
+	return (
+		local.getFullYear() +
+		"-" +
+		pad(local.getMonth() + 1) +
+		"-" +
+		pad(local.getDate()) +
+		"T" +
+		pad(local.getHours()) +
+		":" +
+		pad(local.getMinutes())
+	);
 }
 
 function renderNoteShiftTimePicker(screenEl) {
-    screenEl.innerHTML = "";
+	screenEl.innerHTML = "";
 
-    const container = document.createElement("div");
-    container.className = "maxx-note-shift-container";
+	const container = document.createElement("div");
+	container.className = "maxx-note-shift-container";
 
-    container.innerHTML = `
+	container.innerHTML = `
         <div class="maxx-shift-buttons">
             <button data-shift="1">Ca 1<br><small>06:00 - 14:00</small></button>
             <button data-shift="2">Ca 2<br><small>14:00 - 22:00</small></button>
@@ -374,357 +383,334 @@ function renderNoteShiftTimePicker(screenEl) {
         </div>
     `;
 
-    screenEl.appendChild(container);
+	screenEl.appendChild(container);
 
-    const startInput = container.querySelector(".maxx-start-time");
-    const endInput = container.querySelector(".maxx-end-time");
-    const noteText = container.querySelector(".maxx-note-text");
+	const startInput = container.querySelector(".maxx-start-time");
+	const endInput = container.querySelector(".maxx-end-time");
+	const noteText = container.querySelector(".maxx-note-text");
 
-    // ===== Quick shift buttons =====
-    container.querySelectorAll("[data-shift]").forEach((btn) => {
-        btn.onclick = () => {
-            container
-                .querySelectorAll("[data-shift]")
-                .forEach((b) => b.classList.remove("active"));
+	// ===== Quick shift buttons =====
+	container.querySelectorAll("[data-shift]").forEach((btn) => {
+		btn.onclick = () => {
+			container.querySelectorAll("[data-shift]").forEach((b) => b.classList.remove("active"));
 
-            btn.classList.add("active");
+			btn.classList.add("active");
 
-            const { start, end } = getShiftTime(Number(btn.dataset.shift));
-            startInput.value = start;
-            endInput.value = end;
-        };
-    });
+			const { start, end } = getShiftTime(Number(btn.dataset.shift));
+			startInput.value = start;
+			endInput.value = end;
+		};
+	});
 
-    // ===== Confirm =====
-    container.querySelector(".maxx-confirm-btn").onclick = async () => {
-        const start = startInput.value;
-        const end = endInput.value;
+	// ===== Confirm =====
+	container.querySelector(".maxx-confirm-btn").onclick = async () => {
+		const start = startInput.value;
+		const end = endInput.value;
 
-        if (!start || !end) {
-            alert("Vui lòng chọn đầy đủ thời gian");
-            return;
-        }
+		if (!start || !end) {
+			alert("Vui lòng chọn đầy đủ thời gian");
+			return;
+		}
 
-        const target = detectTargetByURL();
-        if (!target) {
-            alert("❌ Không xác định được hệ thống");
-            return;
-        }
+		const target = detectTargetByURL();
+		if (!target) {
+			alert("❌ Không xác định được hệ thống");
+			return;
+		}
 
-        const shiftLabel =
-            container
-                .querySelector("[data-shift].active")
-                ?.innerText?.split("\n")[0] || "Ca";
+		const shiftLabel = container.querySelector("[data-shift].active")?.innerText?.split("\n")[0] || "Ca";
 
-        const editorEl = container.querySelector(".maxx-note-editor");
-        const copyBtn = container.querySelector(".maxx-copy-btn");
+		const editorEl = container.querySelector(".maxx-note-editor");
+		const copyBtn = container.querySelector(".maxx-copy-btn");
 
-        editorEl.textContent = "⏳ Đang crawl dữ liệu...";
-        copyBtn.onclick = null; // reset handler cũ
+		editorEl.textContent = "⏳ Đang crawl dữ liệu...";
+		copyBtn.onclick = null; // reset handler cũ
 
-        try {
-            const { noteHTML, copyText } = await processData({
-                target,
-                startTime: start,
-                endTime: end,
-                shiftLabel,
-            });
+		try {
+			const { noteHTML, copyText } = await processData({
+				target,
+				startTime: start,
+				endTime: end,
+				shiftLabel,
+			});
 
-            // render UI (có link)
-            editorEl.innerHTML = noteHTML;
+			// render UI (có link)
+			editorEl.innerHTML = noteHTML;
 
-            // ✅ COPY CHỈ SUMMARY
-            copyBtn.onclick = async () => {
-                if (!copyText) {
-                    alert("Không có nội dung để copy");
-                    return;
-                }
+			// ✅ COPY CHỈ SUMMARY
+			copyBtn.onclick = async () => {
+				if (!copyText) {
+					alert("Không có nội dung để copy");
+					return;
+				}
 
-                await navigator.clipboard.writeText(copyText);
-                copyBtn.innerText = "Đã copy";
-                setTimeout(() => (copyBtn.innerText = "Copy Note"), 1500);
-            };
+				await navigator.clipboard.writeText(copyText);
+				copyBtn.innerText = "Đã copy";
+				setTimeout(() => (copyBtn.innerText = "Copy Note"), 1500);
+			};
 
-            // copy thủ công khi bôi đen
-            editorEl.addEventListener("copy", (e) => {
-                const sel = window.getSelection();
-                if (!sel || sel.isCollapsed) return;
+			// copy thủ công khi bôi đen
+			editorEl.addEventListener("copy", (e) => {
+				const sel = window.getSelection();
+				if (!sel || sel.isCollapsed) return;
 
-                e.preventDefault();
-                e.clipboardData.setData("text/plain", sel.toString());
-            });
-        } catch (err) {
-            editorEl.textContent =
-                err.message === "SESSION_INVALID_OR_NOT_LOGIN"
-                    ? "❌ Bạn chưa đăng nhập hệ thống này"
-                    : "❌ Lỗi xử lý dữ liệu";
-        }
-    };
+				e.preventDefault();
+				e.clipboardData.setData("text/plain", sel.toString());
+			});
+		} catch (err) {
+			editorEl.textContent = err.message === "SESSION_INVALID_OR_NOT_LOGIN" ? "❌ Bạn chưa đăng nhập hệ thống này" : "❌ Lỗi xử lý dữ liệu";
+		}
+	};
 }
 
 function filterCategory(target, ticket) {
-    const title = ticket.title?.toLowerCase() || "";
+	const title = ticket.title?.toLowerCase() || "";
+	const CATEGORY = config?.mapping?.CATEGORY_LABEL;
 
-    const base = () => {
-        if (title.includes("scan web") || title.includes("lỗ hổng"))
-            return "Scan Web";
-        if (title.includes("bruteforce")) return "Bruteforce";
-        if (title.includes("command") || title.includes("thực thi lệnh"))
-            return "Command";
-        if (title.includes("kata")) return "Kata alert";
-        if (title.includes("đổi mật khẩu")) return "Change password";
-        if (title.includes("mã độc") || title.includes("malware"))
-            return "Malware";
-        if (title.includes("ngừng đẩy log")) return "ngừng đẩy log";
-        if (title.includes("tạo file") || title.includes("create file"))
-            return "create file";
-        if (title.includes("xác minh hành vi")) return "xác minh hành vi";
-        return "re-check";
-    };
+	if (!CATEGORY) return "re-check";
 
-    if (target === "mss") {
-        if (title.includes("khóa tài khoản")) return "lock acc";
-        if (
-            title.includes("tạo mới tài khoản") ||
-            title.includes("create user")
-        )
-            return "create acc";
-    }
+	// ưu tiên target-specific
+	if (target && CATEGORY[target]) {
+		const targetMatch = matchCategoryByMap(title, CATEGORY[target]);
+		if (targetMatch) return targetMatch;
+	}
 
-    return base();
+	// fallback base
+	if (CATEGORY.base) {
+		const baseMatch = matchCategoryByMap(title, CATEGORY.base);
+		if (baseMatch) return baseMatch;
+	}
+
+	return "re-check";
 }
 
 function groupTicketsString(target, tickets) {
-    if (!tickets.length) return "";
+	if (!tickets.length) return "";
 
-    tickets.sort((a, b) =>
-        filterCategory(target, a).localeCompare(filterCategory(target, b))
-    );
+	tickets.sort((a, b) => filterCategory(target, a).localeCompare(filterCategory(target, b)));
 
-    let result = "";
-    let current = "";
-    let temp = [];
+	let result = "";
+	let current = "";
+	let temp = [];
 
-    for (const t of tickets) {
-        const cat = filterCategory(target, t);
-        if (!current) current = cat;
+	for (const t of tickets) {
+		const cat = filterCategory(target, t);
+		if (!current) current = cat;
 
-        if (cat === current) {
-            temp.push(buildTicketLink(target, t));
-        } else {
-            result += `${temp.join(", ")} ${current}; `;
-            current = cat;
-            temp = [buildTicketLink(target, t)];
-        }
-    }
+		if (cat === current) {
+			temp.push(buildTicketLink(target, t));
+		} else {
+			result += `${temp.join(", ")} ${current}; `;
+			current = cat;
+			temp = [buildTicketLink(target, t)];
+		}
+	}
 
-    if (temp.length) {
-        result += `${temp.join(", ")} ${current}`;
-    }
+	if (temp.length) {
+		result += `${temp.join(", ")} ${current}`;
+	}
 
-    return result.trim();
+	return result.trim();
 }
 
 function detectTargetByURL() {
-    const host = location.hostname;
+	const host = location.hostname;
 
-    if (host.includes("ticket.vnpt.vn")) return "siem";
-    if (host.includes("dashboard-soc.vnpt.vn")) return "mss";
+	if (host.includes("ticket.vnpt.vn")) return "siem";
+	if (host.includes("dashboard-soc.vnpt.vn")) return "mss";
 
-    return null;
+	return null;
 }
 
 function cleanTitle(title = "") {
-    return String(title)
-        .replace(/\[[^\]]*\]/g, "")
-        .trim();
+	return String(title)
+		.replace(/\[[^\]]*\]/g, "")
+		.trim();
 }
 
 function buildTicketLink(target, ticket) {
-    const id = ticket.id;
-    const number = ticket.number;
+	const id = ticket.id;
+	const number = ticket.number;
 
-    if (!id || !number) return number || "";
+	if (!id || !number) return number || "";
 
-    if (target === "mss") {
-        return `<a href="https://dashboard-soc.vnpt.vn/ticket/#ticket/zoom/${id}" target="_blank">${number}</a>`;
-    }
+	if (target === "mss") {
+		return `<a href="https://dashboard-soc.vnpt.vn/ticket/#ticket/zoom/${id}" target="_blank">${number}</a>`;
+	}
 
-    if (target === "siem") {
-        return `<a href="https://ticket.vnpt.vn/#ticket/zoom/${id}" target="_blank">${number}</a>`;
-    }
+	if (target === "siem") {
+		return `<a href="https://ticket.vnpt.vn/#ticket/zoom/${id}" target="_blank">${number}</a>`;
+	}
 
-    return number;
+	return number;
 }
 
 async function processData({ target, startTime, endTime, shiftLabel }) {
-    const { STATE_LABEL, SPECIAL_ORG } = config.mapping;
+	const { STATE_LABEL, SPECIAL_ORG } = config.mapping;
 
-    const data = await fetchAllTickets(target);
+	const data = await fetchAllTickets(target);
 
-    if (!data || !data.assets || !data.assets.Ticket) {
-        throw new Error("SESSION_INVALID_OR_NOT_LOGIN");
-    }
+	if (!data || !data.assets || !data.assets.Ticket) {
+		throw new Error("SESSION_INVALID_OR_NOT_LOGIN");
+	}
 
-    const ticketsAll = Object.values(data.assets.Ticket || {});
-    const stateMap = data.assets.TicketState || {};
+	const ticketsAll = Object.values(data.assets.Ticket || {});
+	const stateMap = data.assets.TicketState || {};
 
-    if (!ticketsAll.length) {
-        throw new Error("NO_TICKET_DATA");
-    }
+	if (!ticketsAll.length) {
+		throw new Error("NO_TICKET_DATA");
+	}
 
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+	const start = new Date(startTime);
+	const end = new Date(endTime);
 
-    /* ============================
+	/* ============================
        1️⃣ Filter tickets by time
     ============================ */
-    const tickets = ticketsAll.filter((t) => {
-        const time = new Date(t.created_at || t.updated_at);
-        return time >= start && time <= end;
-    });
+	const tickets = ticketsAll.filter((t) => {
+		const time = new Date(t.created_at || t.updated_at);
+		return time >= start && time <= end;
+	});
 
-    /* ============================
+	/* ============================
        2️⃣ State statistics
     ============================ */
-    const stateCount = {};
-    tickets.forEach((t) => {
-        const stateName = stateMap[t.state_id]?.name || `#${t.state_id}`;
-        const label = STATE_LABEL[target]?.[stateName] || stateName;
-        stateCount[label] = (stateCount[label] || 0) + 1;
-    });
+	const stateCount = {};
+	tickets.forEach((t) => {
+		const stateName = stateMap[t.state_id]?.name || `#${t.state_id}`;
+		const label = STATE_LABEL[target]?.[stateName] || stateName;
+		stateCount[label] = (stateCount[label] || 0) + 1;
+	});
 
-    /* ============================
+	/* ============================
        3️⃣ Build data buckets
     ============================ */
-    let summaryHTML = "";
-    let summaryText = "";
-    let recheckHTML = "";
+	let summaryHTML = "";
+	let summaryText = "";
+	let recheckHTML = "";
 
-    const recheckTickets = [];
+	const recheckTickets = [];
 
-    /* ============================
+	/* ============================
        4️⃣ MSS logic
     ============================ */
-    if (target === "mss") {
-        const MSS_list = [];
-        const org_lists = {};
+	if (target === "mss") {
+		const MSS_list = [];
+		const org_lists = {};
 
-        tickets.forEach((t) => {
-            if (![1, 2].includes(t.state_id)) return;
+		tickets.forEach((t) => {
+			if (![1, 2].includes(t.state_id)) return;
 
-            const cat = filterCategory(target, t);
-            if (cat === "re-check") recheckTickets.push(t);
+			const cat = filterCategory(target, t);
+			if (cat === "re-check") recheckTickets.push(t);
 
-            if (SPECIAL_ORG[t.organization_id]) {
-                const org = SPECIAL_ORG[t.organization_id];
-                if (!org_lists[org]) org_lists[org] = [];
-                org_lists[org].push(t);
-            } else {
-                MSS_list.push(t);
-            }
-        });
+			if (SPECIAL_ORG[t.organization_id]) {
+				const org = SPECIAL_ORG[t.organization_id];
+				if (!org_lists[org]) org_lists[org] = [];
+				org_lists[org].push(t);
+			} else {
+				MSS_list.push(t);
+			}
+		});
 
-        // MSS
-        const mssHTML = groupTicketsString(target, MSS_list);
-        const mssText = mssHTML.replace(/<[^>]+>/g, "");
+		// MSS
+		const mssHTML = groupTicketsString(target, MSS_list);
+		const mssText = mssHTML.replace(/<[^>]+>/g, "");
 
-        if (mssHTML) {
-            summaryHTML += `MSS: ${mssHTML} chưa xử lý.\n`;
-            summaryText += `MSS: ${mssText} chưa xử lý.\n`;
-        }
+		if (mssHTML) {
+			summaryHTML += `MSS: ${mssHTML} chưa xử lý.\n`;
+			summaryText += `MSS: ${mssText} chưa xử lý.\n`;
+		}
 
-        // ORG (VNPOST, ABBank, ...)
-        Object.entries(org_lists).forEach(([org, list]) => {
-            const html = groupTicketsString(target, list);
-            const text = html.replace(/<[^>]+>/g, "");
+		// ORG (VNPOST, ABBank, ...)
+		Object.entries(org_lists).forEach(([org, list]) => {
+			const html = groupTicketsString(target, list);
+			const text = html.replace(/<[^>]+>/g, "");
 
-            if (html) {
-                summaryHTML += `${org}: ${html} chưa xử lý.\n`;
-                summaryText += `${org}: ${text} chưa xử lý.\n`;
-            }
-        });
-    }
+			if (html) {
+				summaryHTML += `${org}: ${html} chưa xử lý.\n`;
+				summaryText += `${org}: ${text} chưa xử lý.\n`;
+			}
+		});
+	}
 
-    /* ============================
+	/* ============================
        5️⃣ SIEM logic
     ============================ */
-    if (target === "siem") {
-        const list = [];
+	if (target === "siem") {
+		const list = [];
 
-        tickets.forEach((t) => {
-            if (![1, 2].includes(t.state_id)) return;
+		tickets.forEach((t) => {
+			if (![1, 2].includes(t.state_id)) return;
 
-            const cat = filterCategory(target, t);
-            if (cat === "re-check") recheckTickets.push(t);
-            list.push(t);
-        });
+			const cat = filterCategory(target, t);
+			if (cat === "re-check") recheckTickets.push(t);
+			list.push(t);
+		});
 
-        const siemHTML = groupTicketsString(target, list);
-        const siemText = siemHTML.replace(/<[^>]+>/g, "");
+		const siemHTML = groupTicketsString(target, list);
+		const siemText = siemHTML.replace(/<[^>]+>/g, "");
 
-        if (siemHTML) {
-            summaryHTML += `SIEM: ${siemHTML} chưa xử lý.\n`;
-            summaryText += `SIEM: ${siemText} chưa xử lý.\n`;
-        }
-    }
+		if (siemHTML) {
+			summaryHTML += `SIEM: ${siemHTML} chưa xử lý.\n`;
+			summaryText += `SIEM: ${siemText} chưa xử lý.\n`;
+		}
+	}
 
-    /* ============================
+	/* ============================
        6️⃣ Re-check (HTML only)
     ============================ */
-    if (recheckTickets.length) {
-        recheckHTML += `\n------\nDanh sách Re-check:\n`;
-        recheckTickets.forEach((t) => {
-            recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(
-                t.title
-            )}\n`;
-        });
-    }
+	if (recheckTickets.length) {
+		recheckHTML += `\n------\nDanh sách Re-check:\n`;
+		recheckTickets.forEach((t) => {
+			recheckHTML += `- ${buildTicketLink(target, t)}: ${cleanTitle(t.title)}\n`;
+		});
+	}
 
-    /* ============================
+	/* ============================
        7️⃣ Build final NOTE (HTML)
     ============================ */
-    const block = [];
-    block.push(`=== NOTE ${target.toUpperCase()} (${shiftLabel}) ===`);
-    block.push(summaryHTML.trim());
+	const block = [];
+	block.push(`=== NOTE ${target.toUpperCase()} (${shiftLabel}) ===`);
+	block.push(summaryHTML.trim());
 
-    if (recheckHTML) block.push(recheckHTML.trim());
+	if (recheckHTML) block.push(recheckHTML.trim());
 
-    block.push(`\nTổng ticket lọc: ${tickets.length}`);
-    block.push(`Thống kê trạng thái:`);
+	block.push(`\nTổng ticket lọc: ${tickets.length}`);
+	block.push(`Thống kê trạng thái:`);
 
-    Object.entries(stateCount).forEach(([s, c]) => block.push(`- ${s}: ${c}`));
+	Object.entries(stateCount).forEach(([s, c]) => block.push(`- ${s}: ${c}`));
 
-    block.push(`Lần chạy: ${new Date().toLocaleString("vi-VN")}`);
+	block.push(`Lần chạy: ${new Date().toLocaleString("vi-VN")}`);
 
-    /* ============================
+	/* ============================
        8️⃣ RETURN (CRITICAL)
     ============================ */
-    return {
-        noteHTML: block.join("\n"),
-        copyText: summaryText.trim(), // ✅ CHỈ SUMMARY – KHÔNG HTML – KHÔNG RECHECK
-    };
+	return {
+		noteHTML: block.join("\n"),
+		copyText: summaryText.trim(), // ✅ CHỈ SUMMARY – KHÔNG HTML – KHÔNG RECHECK
+	};
 }
 
 export default function noteShift(ctx) {
-    if (!config.enabled) return;
+	if (!config.enabled) return;
 
-    observeWhenVisible(
-        ".overview-table .page-header",
-        (pageHeaderEl) => {
-            noteShiftBtn(config, pageHeaderEl);
-        },
-        {
-            debounce: 150,
-        }
-    );
+	observeWhenVisible(
+		".overview-table .page-header",
+		(pageHeaderEl) => {
+			noteShiftBtn(config, pageHeaderEl);
+		},
+		{
+			debounce: 150,
+		}
+	);
 
-    console.log("✅ Maxx Module Loaded: SOC Ticket Note Shift");
+	console.log("✅ Maxx Module Loaded: SOC Ticket Note Shift");
 }
 
 /* ==============================
    DEV ENTRY
 ============================== */
 if (typeof __MAXX_DEV__ !== "undefined") {
-    window.__MAXX_DEV_ENTRY__ = noteShift;
+	window.__MAXX_DEV_ENTRY__ = noteShift;
 }

@@ -20,8 +20,9 @@
   // src/modules/soc/ticket/close_ticket/config.js
   var config_default = {
     name: "close-ticket module",
+    // module-id: Y2xvc2UtdGlja2V0IG1vZHVsZQ==
     enabled: true,
-    match: ["*://ticket.vnpt.vn/#ticket/zoom/*"],
+    match: ["*://ticket.vnpt.vn/*"],
     exclude: [],
     runAt: "document-end",
     iframe: false,
@@ -75,8 +76,6 @@
 
     /* ===== DISABLED STATE ===== */
     .tabsSidebar-action.disabled {
-        pointer-events: none;
-        opacity: 0.4;
         cursor: not-allowed;
     }
   `;
@@ -114,6 +113,11 @@
   function onCloseButtonClick() {
     if (isTicketClosed()) return;
     if (!isAllowedGroup()) return;
+    const closeBtn = document.querySelector(".tabsSidebar-action");
+    if (closeBtn) {
+      closeBtn.classList.add("disabled");
+      closeBtn.title = "Ticket đang được đóng...";
+    }
     const stateControl = document.querySelector('.form-control[name="state_id"]');
     if (!stateControl) {
       console.warn('[close-ticket] Không tìm thấy <.form-control[name="state_id"]>');
@@ -127,7 +131,6 @@
       return;
     }
     updateButton.click();
-    setTimeout(disconnectObserver, 500);
   }
   __name(onCloseButtonClick, "onCloseButtonClick");
   function isTicketClosed() {
@@ -155,6 +158,11 @@
     return currentGroupId === allowedGroupId;
   }
   __name(isAllowedGroup, "isAllowedGroup");
+  function resetCloseButton() {
+    const oldBtn = document.querySelector(".tabsSidebar-action");
+    if (oldBtn) oldBtn.remove();
+  }
+  __name(resetCloseButton, "resetCloseButton");
   function observeDOM() {
     if (domObserver) return;
     let scheduled = false;
@@ -167,6 +175,7 @@
         if (newTicketId && newTicketId !== currentTicketId) {
           console.log(`[close-ticket] Ticket changed: ${currentTicketId} → ${newTicketId}`);
           currentTicketId = newTicketId;
+          resetCloseButton();
           injectCloseButton();
           return;
         }
